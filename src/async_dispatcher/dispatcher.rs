@@ -19,21 +19,22 @@ impl DispatcherBuilder {
         }
     }
 
-//    // Insert a resource that will be available once the dispatcher is running. This will create
-//    // locks for each resource to be used during dispatch
-//    pub fn insert<R>(mut self, r: R) -> Self
-//    where
-//        R: shred::Resource,
-//    {
-//        let resource_id = ResourceId::new::<R>();
-//        // We could possibly do this just-in-time since we global lock to dispatch anyways, but
-//        // it would require wrapping in an RwLock so that we can get a mut ref
-//        self.resource_locks
-//            .insert(resource_id.clone(), tokio::sync::lock::Lock::new(()));
-//
-//        self.world.insert_by_id(resource_id, r);
-//        self
-//    }
+    pub fn register_resource<T : 'static>(mut self) -> Self
+    {
+        self.register_resource_id(ResourceId::new::<T>())
+    }
+
+    // Insert a resource that will be available once the dispatcher is running. This will create
+    // locks for each resource to be used during dispatch
+    pub fn register_resource_id(mut self, resource_id: ResourceId) -> Self
+    {
+        // We could possibly do this just-in-time since we global lock to dispatch anyways, but
+        // it would require wrapping in an RwLock so that we can get a mut ref
+        self.resource_locks
+            .insert(resource_id.clone(), tokio::sync::lock::Lock::new(()));
+
+        self
+    }
 
     // Create the dispatcher
     pub fn build(self) -> Dispatcher {
@@ -85,7 +86,7 @@ impl Dispatcher {
     // Call this to kick off processing.
     pub fn enter_game_loop<F, FutureT>(self, f: F) //-> shred::World
     where
-        F: Fn(Arc<Dispatcher>) -> FutureT + Send + Sync + Copy + 'static,
+        F: Fn(Arc<Dispatcher>) -> FutureT + Send + Sync + 'static,
         FutureT: futures::future::Future<Item = (), Error = ()> + Send + 'static,
     {
         // Put the dispatcher in an Arc so it can be shared among tasks
@@ -98,7 +99,7 @@ impl Dispatcher {
             let dispatcher_clone2 = dispatcher_clone.clone();
 
             // Get a future that represents this frame's work
-            (f.clone())(dispatcher_clone.clone()).map(move |_| {
+            (f)(dispatcher_clone.clone()).map(move |_| {
                 return if dispatcher_clone2.should_terminate.load(Ordering::Acquire) {
                     futures::future::Loop::Break(())
                 } else {
@@ -168,4 +169,6 @@ impl Dispatcher {
 //        use futures::future::Future;
 //        Box::new(Dispatcher::create_future_with_result(dispatcher, system).map(|_| ()))
 //    }
+
+
 }

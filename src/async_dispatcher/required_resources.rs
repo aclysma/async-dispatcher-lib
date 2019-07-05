@@ -12,19 +12,23 @@ pub struct RequiredResources<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl<T> RequiredResources<T> {
-    pub fn new(reads: Vec<ResourceId>, writes: Vec<ResourceId>) -> Self {
+impl<T : RequiresResources> RequiredResources<T> {
+    pub fn new() -> Self {
         RequiredResources {
-            reads,
-            writes,
-            phantom_data: PhantomData,
+            reads: T::reads(),
+            writes: T::writes(),
+            phantom_data: PhantomData
         }
     }
 }
 
-pub trait RequiresResources {
+pub trait RequiresResources : Sized {
     fn reads() -> Vec<super::ResourceId>;
     fn writes() -> Vec<super::ResourceId>;
+
+    fn required_resources() -> RequiredResources<Self> {
+        RequiredResources::<Self>::new()
+    }
 }
 
 impl RequiresResources for () {
