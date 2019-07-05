@@ -85,8 +85,33 @@ fn main_shred() {
 type ExampleSystemData<'a> = (shred::WriteExpect<'a, Pos>, shred::ReadExpect<'a, Vel>, shred::WriteExpect<'a, ResA>, shred::WriteExpect<'a, ResB>);
 
 
-fn run_system() {
+fn run_shred_system<'a, T, U>(
+    dispatcher: Arc<async_dispatcher::Dispatcher>,
+    world: Arc<shred::World>,
+    system: T
+) -> impl futures::future::Future<Item=(), Error=()>
+    where
+        T: shred::System<'a, SystemData=U>,
+        U: shred::SystemData<'a>
+{
+    use futures::future::Future;
+    use async_dispatcher::RequiresResources;
 
+    // Maybe this can't work because I
+    let system2 = HelloWorldSystem { dispatcher: dispatcher.clone() };
+    //async_dispatcher::AcquireResources::new(dispatcher.clone(), <HelloWorldSystem as shred::System>::SystemData::required_resources())
+    async_dispatcher::AcquireResources::new(dispatcher.clone(), <U as shred::SystemData>::required_resources())
+        .map_err(|_| ())
+        .and_then(move |guards| {
+
+            let world = world.clone();
+            let mut system = HelloWorldSystem { dispatcher: dispatcher.clone() };
+            use shred::RunNow;
+            system.run_now(&world);
+
+
+            Ok(())
+        })
 }
 
 fn main() {
@@ -118,20 +143,11 @@ fn main() {
         //let w = Arc::clone(&world);
         let world = Arc::clone(&world);
 
-        println!("hi");
-
-        async_dispatcher::AcquireResources::new(dispatcher.clone(), <HelloWorldSystem as shred::System>::SystemData::required_resources())
-            .map_err(|_| ())
-            .and_then(move |guards| {
-
-                let world = world.clone();
-                let mut system = HelloWorldSystem { dispatcher: dispatcher.clone() };
-                use shred::RunNow;
-                system.run_now(&world);
-
-
-                Ok(())
-            })
+        run_shred_system(
+            dispatcher.clone(),
+            world.clone(),
+            HelloWorldSystem { dispatcher: dispatcher.clone() }
+        )
     })
 
 
