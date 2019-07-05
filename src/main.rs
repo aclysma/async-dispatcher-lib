@@ -7,7 +7,7 @@ mod requires_resources_shred;
 mod async_dispatcher;
 
 use std::sync::Arc;
-
+use crate::async_dispatcher::RequiresResources;
 
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -76,40 +76,33 @@ fn main_shred() {
     let reads = <(WriteExpect<Pos>, ReadExpect<Vel>, WriteExpect<ResA>, WriteExpect<ResB>)>::reads();
     let writes = <(WriteExpect<Pos>, ReadExpect<Vel>, WriteExpect<ResA>, WriteExpect<ResB>)>::writes();
 
+    type ExampleSystemData<'a> = (shred::WriteExpect<'a, Pos>, shred::ReadExpect<'a, Vel>, shred::WriteExpect<'a, ResA>, shred::WriteExpect<'a, ResB>);
     let reads2 = ExampleSystemData::required_resources();
 
     println!("shred reads: {:?}", reads);
     println!("shred writes: {:?}", writes);
 }
 
-type ExampleSystemData<'a> = (shred::WriteExpect<'a, Pos>, shred::ReadExpect<'a, Vel>, shred::WriteExpect<'a, ResA>, shred::WriteExpect<'a, ResB>);
-
-
-fn run_shred_system<'a, T, U>(
+fn run_shred_system<T>(
     dispatcher: Arc<async_dispatcher::Dispatcher>,
     world: Arc<shred::World>,
     system: T
 ) -> impl futures::future::Future<Item=(), Error=()>
-    where
-        T: shred::System<'a, SystemData=U>,
-        U: shred::SystemData<'a>
+where
+    T : shred::System<'static>,
+    <T as shred::System<'static>>::SystemData: async_dispatcher::RequiresResources
 {
     use futures::future::Future;
-    use async_dispatcher::RequiresResources;
 
-    // Maybe this can't work because I
+    let required_resources = <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
+
     let system2 = HelloWorldSystem { dispatcher: dispatcher.clone() };
-    //async_dispatcher::AcquireResources::new(dispatcher.clone(), <HelloWorldSystem as shred::System>::SystemData::required_resources())
-    async_dispatcher::AcquireResources::new(dispatcher.clone(), <U as shred::SystemData>::required_resources())
-        .map_err(|_| ())
+    async_dispatcher::AcquireResources::new(dispatcher.clone(), required_resources)
         .and_then(move |guards| {
-
             let world = world.clone();
             let mut system = HelloWorldSystem { dispatcher: dispatcher.clone() };
             use shred::RunNow;
             system.run_now(&world);
-
-
             Ok(())
         })
 }
@@ -149,8 +142,4 @@ fn main() {
             HelloWorldSystem { dispatcher: dispatcher.clone() }
         )
     })
-
-
-
-
 }
