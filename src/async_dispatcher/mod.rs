@@ -7,6 +7,7 @@ mod required_resources;
 mod resource_id;
 
 pub use acquire_resources::AcquireResources;
+pub use acquire_resources::AcquiredResourcesLockGuards;
 pub use dispatcher::Dispatcher;
 pub use dispatcher::DispatcherBuilder;
 pub use execute_parallel::ExecuteParallel;
