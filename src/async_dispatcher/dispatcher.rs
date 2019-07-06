@@ -6,7 +6,6 @@ use super::ResourceId;
 
 // This allows the user to add all the resources that will be used during execution
 pub struct DispatcherBuilder {
-    //world: shred::World,
     resource_locks: HashMap<ResourceId, tokio::sync::lock::Lock<()>>,
 }
 
@@ -14,7 +13,6 @@ impl DispatcherBuilder {
     // Create an empty dispatcher builder
     pub fn new() -> Self {
         DispatcherBuilder {
-            //world: shred::World::empty(),
             resource_locks: HashMap::new(),
         }
     }
@@ -40,7 +38,6 @@ impl DispatcherBuilder {
     pub fn build(self) -> Dispatcher {
         return Dispatcher {
             next_task_id: std::sync::atomic::AtomicUsize::new(0),
-            //world: Arc::new(self.world),
             dispatch_lock: tokio::sync::lock::Lock::new(()),
             resource_locks: self.resource_locks,
             should_terminate: std::sync::atomic::AtomicBool::new(false),
@@ -56,7 +53,6 @@ impl DispatcherBuilder {
 // it's waiting.
 pub struct Dispatcher {
     next_task_id: std::sync::atomic::AtomicUsize,
-    //world: Arc<shred::World>,
     dispatch_lock: tokio::sync::lock::Lock<()>,
     //TODO: Change this to a RwLock, but waiting until I have something more "real" to test with
     resource_locks: HashMap<ResourceId, tokio::sync::lock::Lock<()>>,
@@ -84,7 +80,7 @@ impl Dispatcher {
     }
 
     // Call this to kick off processing.
-    pub fn enter_game_loop<F, FutureT>(self, f: F) //-> shred::World
+    pub fn enter_game_loop<F, FutureT>(self, f: F)
     where
         F: Fn(Arc<Dispatcher>) -> FutureT + Send + Sync + 'static,
         FutureT: futures::future::Future<Item = (), Error = ()> + Send + 'static,
@@ -111,19 +107,6 @@ impl Dispatcher {
         // Kick off the process
         debug!("Calling tokio run");
         tokio::run(loop_future);
-
-//        // After execution ends, unwrap the dispatcher arc
-//        let dispatcher = Arc::try_unwrap(dispatcher).unwrap_or_else(|_| {
-//            unreachable!();
-//        });
-//
-//        // Then unwrap the world inside it
-//        let world = Arc::try_unwrap(dispatcher.world).unwrap_or_else(|_| {
-//            unreachable!();
-//        });
-//
-//        // Return the world
-//        world
     }
 
 //    pub fn run_system<T>(&self, mut system: T) -> T

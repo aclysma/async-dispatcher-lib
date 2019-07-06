@@ -8,6 +8,7 @@ mod async_dispatcher;
 
 use std::sync::Arc;
 use crate::async_dispatcher::RequiresResources;
+use crate::requires_resources_shred::{ShredDispatcher, ShredDispatcherContext};
 
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -31,7 +32,7 @@ struct HelloWorldResourceB {
 }
 
 struct HelloWorldSystem {
-    dispatcher: Arc<async_dispatcher::Dispatcher>,
+    dispatcher: Arc<ShredDispatcherContext>,
 }
 
 impl<'a> shred::System<'a> for HelloWorldSystem {
@@ -68,19 +69,14 @@ fn main_legion() {
     println!("legion reads: {:?}", reads);
     println!("legion writes: {:?}", writes);
 }
-
-fn main_shred() {
-    use shred::ReadExpect;
-    use shred::WriteExpect;
-    use async_dispatcher::RequiresResources;
-    let reads = <(WriteExpect<Pos>, ReadExpect<Vel>, WriteExpect<ResA>, WriteExpect<ResB>)>::reads();
-    let writes = <(WriteExpect<Pos>, ReadExpect<Vel>, WriteExpect<ResA>, WriteExpect<ResB>)>::writes();
-
-    type ExampleSystemData<'a> = (shred::WriteExpect<'a, Pos>, shred::ReadExpect<'a, Vel>, shred::WriteExpect<'a, ResA>, shred::WriteExpect<'a, ResB>);
-    let reads2 = ExampleSystemData::required_resources();
-
-    println!("shred reads: {:?}", reads);
-    println!("shred writes: {:?}", writes);
+/*
+pub fn run_system<T>(world: Arc<shred::World>, mut system: T) -> T
+    where
+        T: for<'b> shred::System<'b> + Send + 'static,
+{
+    use shred::RunNow;
+    system.run_now(&world);
+    system
 }
 
 fn run_shred_system<T>(
@@ -96,18 +92,20 @@ where
 
     let required_resources = <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
 
-    let system2 = HelloWorldSystem { dispatcher: dispatcher.clone() };
     async_dispatcher::AcquireResources::new(dispatcher.clone(), required_resources)
         .and_then(move |guards| {
-            let world = world.clone();
-            let mut system = HelloWorldSystem { dispatcher: dispatcher.clone() };
-            use shred::RunNow;
-            system.run_now(&world);
+//            let world = world.clone();
+//            use shred::RunNow;
+//            system.run_now(&world);
+
+            run_system(world.clone(), system);
             Ok(())
         })
 }
+*/
 
-fn main() {
+/*
+fn main_raw() {
     main_shred();
     main_legion();
 
@@ -142,4 +140,47 @@ fn main() {
             HelloWorldSystem { dispatcher: dispatcher.clone() }
         )
     })
+}
+*/
+
+fn main_shred() {
+
+    use requires_resources_shred::ShredDispatcher;
+    use requires_resources_shred::ShredDispatcherBuilder;
+
+    let dispatcher = ShredDispatcherBuilder::new()
+        .insert(ResA)
+        .insert(ResB)
+        .insert(HelloWorldResourceA { value: 5 } )
+        .insert(HelloWorldResourceB { value: 10 } )
+        .build();
+
+    use futures::future::Future;
+    use async_dispatcher::RequiresResources;
+
+    use requires_resources_shred::ShredDispatcherContext;
+
+    let world = dispatcher.enter_game_loop(move |ctx| {
+
+        //let w = Arc::clone(&world);
+        //let world = Arc::clone(&world);
+
+        ctx.run_shred_system(
+            HelloWorldSystem {
+                dispatcher: ctx.clone()
+            }
+        )
+
+            /*
+        run_shred_system(
+            dispatcher.clone(),
+            world.clone(),
+            HelloWorldSystem { dispatcher: dispatcher.clone() }
+        )
+        */
+    });
+}
+
+fn main() {
+    main_shred();
 }
