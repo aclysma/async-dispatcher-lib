@@ -20,4 +20,4 @@ pub use resource_id::ResourceId;
 //pub mod shred;
 
 //TODO: conditional compile
-pub mod legion;
+//pub mod legion;

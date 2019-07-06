@@ -4,8 +4,9 @@ extern crate log;
 
 mod async_dispatcher;
 //mod shred_example;
-mod legion_example;
+//mod legion_example;
 mod minimum_example;
+mod minimum;
 
 fn main() {
     //shred_example::shred_example();

@@ -17,7 +17,7 @@ impl DispatcherBuilder {
         }
     }
 
-    pub fn register_resource<T : 'static>(mut self) -> Self
+    pub fn register_resource<T : 'static>(self) -> Self
     {
         self.register_resource_id(ResourceId::new::<T>())
     }

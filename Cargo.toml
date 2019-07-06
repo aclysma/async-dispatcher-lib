@@ -15,6 +15,6 @@ tokio = "0.1"
 
 #legion = "0.1"
 legion = { path = '/Users/philipd/dev/rust/legion' }
-shred = "0.9.2"
+#shred = "0.9.2"
 
 mopa = "0.2"
