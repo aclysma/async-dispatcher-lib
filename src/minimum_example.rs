@@ -5,7 +5,9 @@ use mopa::Any;
 use std::marker::PhantomData;
 
 use std::sync::{Arc, RwLockReadGuard};
-use std::sync::RwLock;
+use shred::cell::TrustCell;
+use shred::cell::Ref;
+use shred::cell::RefMut;
 
 use crate::async_dispatcher::{ResourceId, Dispatcher, DispatcherBuilder, RequiresResources, AcquireResources, AcquiredResourcesLockGuards};
 
@@ -25,7 +27,7 @@ impl<T> Resource for T where T: Any + Send + Sync {}
 
 #[derive(Default)]
 pub struct World {
-    resources: HashMap<ResourceId, RwLock<Box<dyn Resource>>>,
+    resources: HashMap<ResourceId, TrustCell<Box<dyn Resource>>>,
 }
 
 impl World {
@@ -53,7 +55,7 @@ impl World {
         where
             R: Resource,
     {
-        self.resources.insert(id, RwLock::new(Box::new(r)));
+        self.resources.insert(id, TrustCell::new(Box::new(r)));
     }
 
     fn remove_by_id<R>(&mut self, id: ResourceId) -> Option<R>
@@ -62,7 +64,7 @@ impl World {
     {
         self.resources
             .remove(&id)
-            .map(|x: RwLock<Box<dyn Resource>>| x.into_inner().unwrap())
+            .map(TrustCell::into_inner)
             .map(|x: Box<dyn Resource>| x.downcast())
             .map(|x: Result<Box<R>, _>| x.ok().unwrap())
             .map(|x| *x)
@@ -75,15 +77,10 @@ impl World {
     fn try_fetch<R : Resource>(&self) -> Option<ReadBorrow<R>> {
         let res_id = ResourceId::new::<R>();
 
-        let r = self.resources
-            .get(&res_id)
-            .map(|x: &RwLock<Box<dyn Resource>>| x.read())
-            .map(|x: RwLockReadGuard<Box<dyn Resource>>| 3);
-            //.map(|r| ReadBorrow::<R> {
-            //data: (*(*r)) as &R
-            //data: unsafe { (**r).downcast_ref_unchecked() }
-
-
+        self.resources.get(&res_id).map(|r| ReadBorrow {
+            inner: Ref::map(r.borrow(), Box::as_ref),
+            phantom: PhantomData,
+        })
     }
 
     fn fetch_mut<R : Resource>(&self) -> WriteBorrow<R> {
@@ -94,8 +91,8 @@ impl World {
         let res_id = ResourceId::new::<R>();
 
         self.resources.get(&res_id).map(|r| WriteBorrow::<R> {
-            //data: (*(*r)) as &R
-            //data: unsafe { (**r).downcast_mut_unchecked() }
+            inner: RefMut::map(r.borrow_mut(), Box::as_mut),
+            phantom: PhantomData,
         })
     }
 }
@@ -187,19 +184,61 @@ impl DataBorrow for () {
 }
 
 pub struct ReadBorrow<'a, T> {
-    data: &'a T
+    inner: Ref<'a, dyn Resource>,
+    phantom: PhantomData<&'a T>,
 }
 
 impl<'a, T> DataBorrow for ReadBorrow<'a, T> {
 
 }
 
+impl<'a, T> std::ops::Deref for ReadBorrow<'a, T>
+    where
+        T: Resource,
+{
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        unsafe { self.inner.downcast_ref_unchecked() }
+    }
+}
+
+impl<'a, T> Clone for ReadBorrow<'a, T> {
+    fn clone(&self) -> Self {
+        ReadBorrow {
+            inner: self.inner.clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 pub struct WriteBorrow<'a, T> {
-    data: &'a T
+    inner: RefMut<'a, dyn Resource>,
+    phantom: PhantomData<&'a mut T>,
 }
 
 impl<'a, T> DataBorrow for WriteBorrow<'a, T> {
 
+}
+
+impl<'a, T> std::ops::Deref for WriteBorrow<'a, T>
+    where
+        T: Resource,
+{
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        unsafe { self.inner.downcast_ref_unchecked() }
+    }
+}
+
+impl<'a, T> std::ops::DerefMut for WriteBorrow<'a, T>
+    where
+        T: Resource,
+{
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.inner.downcast_mut_unchecked() }
+    }
 }
 
 
@@ -370,7 +409,16 @@ pub fn minimum_example() {
 
 
     let reads = <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>::reads();
-    let fetched = <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>::fetch(&world);
+    {
+        let fetched : (ReadBorrow<HelloWorldResourceA>, WriteBorrow<HelloWorldResourceB>) =
+            <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>::fetch(&world);
+
+        let (a, b) = fetched;
+
+
+        println!("value {}", a.value);
+        println!("value {}", b.value);
+    }
 
     dispatcher.enter_game_loop(move |dispatcher| {
 
@@ -380,11 +428,9 @@ pub fn minimum_example() {
             .and_then(move |acquired_resources| {
                 acquired_resources.visit(|data| {
                     let (a, mut b) = data;
-
-                    //let x = <data as DataRequirement>::Borrow;
-
-                    //println!("{} {}", a.value, b.value);
-
+                    println!("value {}", a.value);
+                    println!("value {}", b.value);
+                    b.value += 5;
                 });
                 Ok(())
             })
