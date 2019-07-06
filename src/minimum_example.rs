@@ -108,8 +108,6 @@ struct HelloWorldResourceB {
     value: i32,
 }
 
-
-
 struct Read<T : Resource> {
     phantom_data: PhantomData<T>
 }
@@ -117,10 +115,6 @@ struct Read<T : Resource> {
 struct Write<T : Resource> {
     phantom_data: PhantomData<T>
 }
-
-
-
-
 
 impl<T : Resource> RequiresResources for Read<T> {
     fn reads() -> Vec<ResourceId> { vec![ResourceId::new::<T>()] }
@@ -131,49 +125,6 @@ impl<T : Resource> RequiresResources for Write<T> {
     fn reads() -> Vec<ResourceId> { vec![] }
     fn writes() -> Vec<ResourceId> { vec![ResourceId::new::<T>()] }
 }
-
-
-// This avoids a 'lifetime on DataRequirement but the DataRequirement can't have a ref to the data
-// from world
-/*
-trait DataRequirement {
-    fn fetch<'a>(world: &'a World) -> Self;
-}
-
-impl DataRequirement for () {
-    fn fetch<'a>(_: &'a World) -> Self {}
-}
-
-impl<T : Resource> DataRequirement for Read<T> {
-    fn fetch<'a>(_: &'a World) -> Self {
-        Read {
-            phantom_data: PhantomData
-        }
-    }
-}
-
-impl<T : Resource> DataRequirement for Write<T> {
-    fn fetch<'a>(_: &'a World) -> Self {
-        Write {
-            phantom_data: PhantomData
-        }
-    }
-}
-
-macro_rules! impl_data {
-    ( $($ty:ident),* ) => {
-        impl<$($ty),*> DataRequirement for ( $( $ty , )* )
-            where $( $ty : DataRequirement ),*
-            {
-                fn fetch<'a>(world: &'a World) -> Self {
-                    #![allow(unused_variables)]
-
-                    ( $( <$ty as DataRequirement>::fetch(world), )* )
-                }
-            }
-    };
-}
-*/
 
 pub trait DataBorrow {
 
@@ -241,11 +192,6 @@ impl<'a, T> std::ops::DerefMut for WriteBorrow<'a, T>
     }
 }
 
-
-
-// This has a 'lifetime on data requirement, but then it still exists before we even query anything
-
-//TODO: Maybe an associated type can convert from this to something with a lifetime?
 pub trait DataRequirement<'a> {
     type Borrow : DataBorrow;
 
@@ -302,48 +248,6 @@ macro_rules! impl_data {
             }
     };
 }
-
-
-// This uses an Arc and avoids the lifetime stuff
-/*
-pub trait DataRequirement {
-    fn fetch(world: &Arc<World>) -> Self;
-}
-
-impl DataRequirement for () {
-    fn fetch(_: &Arc<World>) -> Self {}
-}
-
-impl<T : Resource> DataRequirement for Read<T> {
-    fn fetch(_: &Arc<World>) -> Self {
-        Read {
-            phantom_data: PhantomData
-        }
-    }
-}
-
-impl<T : Resource> DataRequirement for Write<T> {
-    fn fetch(_: &Arc<World>) -> Self {
-        Write {
-            phantom_data: PhantomData
-        }
-    }
-}
-
-macro_rules! impl_data {
-    ( $($ty:ident),* ) => {
-        impl<$($ty),*> DataRequirement for ( $( $ty , )* )
-            where $( $ty : DataRequirement ),*
-            {
-                fn fetch(world: &Arc<World>) -> Self {
-                    #![allow(unused_variables)]
-
-                    ( $( <$ty as DataRequirement>::fetch(world), )* )
-                }
-            }
-    };
-}
-*/
 
 mod impl_data {
     #![cfg_attr(rustfmt, rustfmt_skip)]
@@ -406,19 +310,6 @@ pub fn minimum_example() {
         .register_resource::<HelloWorldResourceA>()
         .register_resource::<HelloWorldResourceB>()
         .build();
-
-
-    let reads = <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>::reads();
-    {
-        let fetched : (ReadBorrow<HelloWorldResourceA>, WriteBorrow<HelloWorldResourceB>) =
-            <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>::fetch(&world);
-
-        let (a, b) = fetched;
-
-
-        println!("value {}", a.value);
-        println!("value {}", b.value);
-    }
 
     dispatcher.enter_game_loop(move |dispatcher| {
 
