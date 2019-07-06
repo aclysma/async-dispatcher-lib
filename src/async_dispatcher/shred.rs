@@ -49,65 +49,6 @@ impl ShredDispatcherBuilder {
     }
 }
 
-pub struct ShredDispatcherContext {
-    dispatcher: Arc<Dispatcher>,
-    world: Arc<shred::World>
-}
-
-impl ShredDispatcherContext {
-    pub fn end_game_loop(&self) {
-        self.dispatcher.end_game_loop();
-    }
-
-    pub fn dispatcher(&self) -> Arc<Dispatcher> {
-        self.dispatcher.clone()
-    }
-
-    pub fn world(&self) -> Arc<shred::World> {
-        self.world.clone()
-    }
-
-    pub fn run_shred_system<T>(
-        &self,
-        mut system: T
-    ) -> impl futures::future::Future<Item=(), Error=()>
-        where
-            T : shred::System<'static> + 'static,
-            <T as shred::System<'static>>::SystemData: RequiresResources
-    {
-        use futures::future::Future;
-
-        let required_resources = <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
-
-        //let dispatcher = self.dispatcher.clone();
-        let world = self.world.clone();
-
-        crate::async_dispatcher::AcquireResources::new(self.dispatcher.clone(), required_resources)
-            .and_then(move |guards| {
-
-                //SAFETY:
-                // We now have exclusive ownership of the system, and an Arc to the world. Therefore,
-                // both will live for the lifetime of this function. Additionally, the mutable system
-                // is not returned, so it can't accidentally hold a raw reference to anything from the world
-                let world = world;
-                let mut system = system;
-
-                unsafe {
-                    let sys : &mut T = &mut system;
-                    let sys : &'static mut T = std::mem::transmute(sys);
-
-                    let world : &shred::World = &world;
-                    let world : &'static shred::World = std::mem::transmute(world);
-
-                    use shred::RunNow;
-                    sys.run_now(&world);
-                }
-
-                Ok(())
-            })
-    }
-}
-
 pub struct ShredDispatcher {
     dispatcher: Dispatcher,
     world: Arc<shred::World>
@@ -140,48 +81,63 @@ impl ShredDispatcher {
         // Return the world
         world
     }
+}
 
-//    pub fn run_system<T>(&self, mut system: T) -> T
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        use shred::RunNow;
-//        system.run_now(&self.world);
-//        system
-//    }
+pub struct ShredDispatcherContext {
+    dispatcher: Arc<Dispatcher>,
+    world: Arc<shred::World>
+}
 
-//    // Queues up a system to run. This code will acquire the appropriate resources first, then
-//    // run the given system
-//    pub fn create_future_with_result<T>(
-//        dispatcher: &Arc<Dispatcher>,
-//        system: T,
-//    ) -> Box<impl futures::Future<Item = T, Error = ()>>
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        let dispatcher = dispatcher.clone();
-//        let required_resources = super::RequiredResources::from_system(&system);
-//        use futures::Future;
-//        Box::new(
-//            super::AcquireResources::<T>::new(dispatcher.clone(), required_resources).and_then(
-//                move |_result| {
-//                    let system = dispatcher.run_system(system);
-//                    Ok(system)
-//                },
-//            ),
-//        )
-//    }
-//
-//    // Queues up a system to run. This code will acquire the appropriate resources first, then
-//    // run the given system
-//    pub fn create_future<T>(
-//        dispatcher: &Arc<Dispatcher>,
-//        system: T,
-//    ) -> Box<impl futures::Future<Item = (), Error = ()>>
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        use futures::future::Future;
-//        Box::new(Dispatcher::create_future_with_result(dispatcher, system).map(|_| ()))
-//    }
+impl ShredDispatcherContext {
+    pub fn end_game_loop(&self) {
+        self.dispatcher.end_game_loop();
+    }
+
+    pub fn dispatcher(&self) -> Arc<Dispatcher> {
+        self.dispatcher.clone()
+    }
+
+    pub fn world(&self) -> Arc<shred::World> {
+        self.world.clone()
+    }
+
+    pub fn run_shred_system<T>(
+        &self,
+        mut system: T
+    ) -> Box<impl futures::future::Future<Item=(), Error=()>>
+        where
+            T : shred::System<'static> + 'static,
+            <T as shred::System<'static>>::SystemData: RequiresResources
+    {
+        use futures::future::Future;
+
+        let required_resources = <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
+
+        //let dispatcher = self.dispatcher.clone();
+        let world = self.world.clone();
+
+        Box::new(crate::async_dispatcher::AcquireResources::new(self.dispatcher.clone(), required_resources)
+            .and_then(move |guards| {
+
+                //SAFETY:
+                // We now have exclusive ownership of the system, and an Arc to the world. Therefore,
+                // both will live for the lifetime of this function. Additionally, the mutable system
+                // is not returned, so it can't accidentally hold a raw reference to anything from the world
+                let world = world;
+                let mut system = system;
+
+                unsafe {
+                    let sys : &mut T = &mut system;
+                    let sys : &'static mut T = std::mem::transmute(sys);
+
+                    let world : &shred::World = &world;
+                    let world : &'static shred::World = std::mem::transmute(world);
+
+                    use shred::RunNow;
+                    sys.run_now(&world);
+                }
+
+                Ok(())
+            }))
+    }
 }
