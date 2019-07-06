@@ -4,7 +4,8 @@ use mopa::Any;
 
 use std::marker::PhantomData;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
+use std::sync::RwLock;
 
 use crate::async_dispatcher::{ResourceId, Dispatcher, DispatcherBuilder, RequiresResources, AcquireResources, AcquiredResourcesLockGuards};
 
@@ -24,7 +25,7 @@ impl<T> Resource for T where T: Any + Send + Sync {}
 
 #[derive(Default)]
 pub struct World {
-    resources: HashMap<ResourceId, Box<dyn Resource>>,
+    resources: HashMap<ResourceId, RwLock<Box<dyn Resource>>>,
 }
 
 impl World {
@@ -52,7 +53,7 @@ impl World {
         where
             R: Resource,
     {
-        self.resources.insert(id, Box::new(r));
+        self.resources.insert(id, RwLock::new(Box::new(r)));
     }
 
     fn remove_by_id<R>(&mut self, id: ResourceId) -> Option<R>
@@ -61,9 +62,41 @@ impl World {
     {
         self.resources
             .remove(&id)
+            .map(|x: RwLock<Box<dyn Resource>>| x.into_inner().unwrap())
             .map(|x: Box<dyn Resource>| x.downcast())
             .map(|x: Result<Box<R>, _>| x.ok().unwrap())
             .map(|x| *x)
+    }
+
+    fn fetch<R : Resource>(&self) -> ReadBorrow<R> {
+        self.try_fetch().unwrap()
+    }
+
+    fn try_fetch<R : Resource>(&self) -> Option<ReadBorrow<R>> {
+        let res_id = ResourceId::new::<R>();
+
+        let r = self.resources
+            .get(&res_id)
+            .map(|x: &RwLock<Box<dyn Resource>>| x.read())
+            .map(|x: RwLockReadGuard<Box<dyn Resource>>| 3);
+            //.map(|r| ReadBorrow::<R> {
+            //data: (*(*r)) as &R
+            //data: unsafe { (**r).downcast_ref_unchecked() }
+
+
+    }
+
+    fn fetch_mut<R : Resource>(&self) -> WriteBorrow<R> {
+        self.try_fetch_mut().unwrap()
+    }
+
+    fn try_fetch_mut<R : Resource>(&self) -> Option<WriteBorrow<R>> {
+        let res_id = ResourceId::new::<R>();
+
+        self.resources.get(&res_id).map(|r| WriteBorrow::<R> {
+            //data: (*(*r)) as &R
+            //data: unsafe { (**r).downcast_mut_unchecked() }
+        })
     }
 }
 
@@ -87,6 +120,8 @@ struct Read<T : Resource> {
 struct Write<T : Resource> {
     phantom_data: PhantomData<T>
 }
+
+
 
 
 
@@ -143,40 +178,84 @@ macro_rules! impl_data {
 }
 */
 
+pub trait DataBorrow {
+
+}
+
+impl DataBorrow for () {
+
+}
+
+pub struct ReadBorrow<'a, T> {
+    data: &'a T
+}
+
+impl<'a, T> DataBorrow for ReadBorrow<'a, T> {
+
+}
+
+pub struct WriteBorrow<'a, T> {
+    data: &'a T
+}
+
+impl<'a, T> DataBorrow for WriteBorrow<'a, T> {
+
+}
+
 
 
 // This has a 'lifetime on data requirement, but then it still exists before we even query anything
 
+//TODO: Maybe an associated type can convert from this to something with a lifetime?
 pub trait DataRequirement<'a> {
-    fn fetch(world: &'a World) -> Self;
+    type Borrow : DataBorrow;
+
+    fn fetch(world: &'a World) -> Self::Borrow;
 }
 
 impl<'a> DataRequirement<'a> for () {
-    fn fetch(_: &'a World) -> Self {}
+    type Borrow = ();
+
+    fn fetch(_: &'a World) -> Self::Borrow { }
 }
 
 impl<'a, T : Resource> DataRequirement<'a> for Read<T> {
-    fn fetch(_: &'a World) -> Self {
-        Read {
-            phantom_data: PhantomData
-        }
+    type Borrow = ReadBorrow<'a, T>;
+
+    fn fetch(world: &'a World) -> Self::Borrow {
+        world.fetch::<T>()
     }
 }
 
 impl<'a, T : Resource> DataRequirement<'a> for Write<T> {
-    fn fetch(_: &'a World) -> Self {
-        Write {
-            phantom_data: PhantomData
-        }
+    type Borrow = WriteBorrow<'a, T>;
+
+    fn fetch(world: &'a World) -> Self::Borrow {
+        world.fetch_mut::<T>()
     }
 }
 
 macro_rules! impl_data {
     ( $($ty:ident),* ) => {
+
+        impl<$($ty),*> DataBorrow for ( $( $ty , )* )
+
+            where $( $ty : DataBorrow ),*
+            {
+
+            }
+
+
+
         impl<'a, $($ty),*> DataRequirement<'a> for ( $( $ty , )* )
+
             where $( $ty : DataRequirement<'a> ),*
             {
-                fn fetch(world: &'a World) -> Self {
+
+                type Borrow = ( $( <$ty as DataRequirement<'a>>::Borrow, )* );
+
+
+                fn fetch(world: &'a World) -> Self::Borrow {
                     #![allow(unused_variables)]
 
                     ( $( <$ty as DataRequirement<'a>>::fetch(world), )* )
@@ -252,7 +331,7 @@ impl<T> AcquiredResources<T>
 
     pub fn visit<'a, F>(&'a self, f : F)
     where
-        F : FnOnce(T),
+        F : FnOnce(T::Borrow),
         T : DataRequirement<'a>
     {
         let fetched = T::fetch(&self.world);
@@ -301,6 +380,8 @@ pub fn minimum_example() {
             .and_then(move |acquired_resources| {
                 acquired_resources.visit(|data| {
                     let (a, mut b) = data;
+
+                    //let x = <data as DataRequirement>::Borrow;
 
                     //println!("{} {}", a.value, b.value);
 
