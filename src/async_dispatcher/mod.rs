@@ -21,3 +21,5 @@ pub use resource_id::ResourceId;
 
 //TODO: conditional compile
 //pub mod legion;
+
+pub mod minimum;
