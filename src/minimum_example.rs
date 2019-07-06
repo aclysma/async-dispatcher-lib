@@ -146,8 +146,8 @@ macro_rules! impl_data {
 
 
 // This has a 'lifetime on data requirement, but then it still exists before we even query anything
-/*
-trait DataRequirement<'a> {
+
+pub trait DataRequirement<'a> {
     fn fetch(world: &'a World) -> Self;
 }
 
@@ -184,10 +184,10 @@ macro_rules! impl_data {
             }
     };
 }
-*/
+
 
 // This uses an Arc and avoids the lifetime stuff
-
+/*
 pub trait DataRequirement {
     fn fetch(world: &Arc<World>) -> Self;
 }
@@ -225,7 +225,7 @@ macro_rules! impl_data {
             }
     };
 }
-
+*/
 
 mod impl_data {
     #![cfg_attr(rustfmt, rustfmt_skip)]
@@ -250,15 +250,14 @@ pub struct AcquiredResources<T>
 impl<T> AcquiredResources<T>
     where T : RequiresResources + 'static + Send {
 
-    pub fn visit<F>(&self, f : F)
+    pub fn visit<'a, F>(&'a self, f : F)
     where
         F : FnOnce(T),
-        T : DataRequirement
+        T : DataRequirement<'a>
     {
         let fetched = T::fetch(&self.world);
         (f)(fetched);
     }
-
 }
 
 pub fn acquire_resources<T>(dispatcher: Arc<Dispatcher>, world: Arc<World>) -> impl futures::future::Future<Item=AcquiredResources<T>, Error=()>
@@ -298,9 +297,12 @@ pub fn minimum_example() {
 
         use futures::future::Future;
 
-        acquire_resources::<(Read<HelloWorldResourceA>)>(dispatcher.clone(), world.clone())
+        acquire_resources::<(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>(dispatcher.clone(), world.clone())
             .and_then(move |acquired_resources| {
                 acquired_resources.visit(|data| {
+                    let (a, mut b) = data;
+
+                    //println!("{} {}", a.value, b.value);
 
                 });
                 Ok(())

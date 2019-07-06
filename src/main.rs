@@ -3,7 +3,7 @@
 extern crate log;
 
 mod async_dispatcher;
-mod shred_example;
+//mod shred_example;
 mod legion_example;
 mod minimum_example;
 

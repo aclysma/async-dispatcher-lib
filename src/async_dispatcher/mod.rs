@@ -17,7 +17,7 @@ pub use required_resources::RequiresResources;
 pub use resource_id::ResourceId;
 
 //TODO: conditional compile
-pub mod shred;
+//pub mod shred;
 
 //TODO: conditional compile
 pub mod legion;
