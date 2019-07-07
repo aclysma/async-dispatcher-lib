@@ -17,15 +17,13 @@ impl DispatcherBuilder {
         }
     }
 
-    pub fn register_resource<T : 'static>(self) -> Self
-    {
+    pub fn register_resource<T: 'static>(self) -> Self {
         self.register_resource_id(ResourceId::new::<T>())
     }
 
     // Insert a resource that will be available once the dispatcher is running. This will create
     // locks for each resource to be used during dispatch
-    pub fn register_resource_id(mut self, resource_id: ResourceId) -> Self
-    {
+    pub fn register_resource_id(mut self, resource_id: ResourceId) -> Self {
         // We could possibly do this just-in-time since we global lock to dispatch anyways, but
         // it would require wrapping in an RwLock so that we can get a mut ref
         self.resource_locks
@@ -108,50 +106,4 @@ impl Dispatcher {
         debug!("Calling tokio run");
         tokio::run(loop_future);
     }
-
-//    pub fn run_system<T>(&self, mut system: T) -> T
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        use shred::RunNow;
-//        system.run_now(&self.world);
-//        system
-//    }
-
-//    // Queues up a system to run. This code will acquire the appropriate resources first, then
-//    // run the given system
-//    pub fn create_future_with_result<T>(
-//        dispatcher: &Arc<Dispatcher>,
-//        system: T,
-//    ) -> Box<impl futures::Future<Item = T, Error = ()>>
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        let dispatcher = dispatcher.clone();
-//        let required_resources = super::RequiredResources::from_system(&system);
-//        use futures::Future;
-//        Box::new(
-//            super::AcquireResources::<T>::new(dispatcher.clone(), required_resources).and_then(
-//                move |_result| {
-//                    let system = dispatcher.run_system(system);
-//                    Ok(system)
-//                },
-//            ),
-//        )
-//    }
-//
-//    // Queues up a system to run. This code will acquire the appropriate resources first, then
-//    // run the given system
-//    pub fn create_future<T>(
-//        dispatcher: &Arc<Dispatcher>,
-//        system: T,
-//    ) -> Box<impl futures::Future<Item = (), Error = ()>>
-//    where
-//        T: for<'b> shred::System<'b> + Send + 'static,
-//    {
-//        use futures::future::Future;
-//        Box::new(Dispatcher::create_future_with_result(dispatcher, system).map(|_| ()))
-//    }
-
-
 }

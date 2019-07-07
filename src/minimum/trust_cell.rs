@@ -1,5 +1,6 @@
-// This is originally from the shred project. No changes, just didn't want to pull in all of shred
-// and it's dependencies.
+// This is originally from the shred project. (I wanted to avoid pulling in all dependencies)
+//
+// Shouldn't have any funtional changes (i.e. added some allow dead_code)
 //
 // Original source available on github: https://github.com/slide-rs/shred
 //

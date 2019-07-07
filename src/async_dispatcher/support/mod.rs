@@ -1,4 +1,3 @@
-
 // This module holds glue-code to ECS systems we integrate with
 
 #[cfg(feature = "minimum")]

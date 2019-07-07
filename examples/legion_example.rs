@@ -1,15 +1,10 @@
-
 use legion::prelude::*;
 
 use std::sync::Arc;
 
-use async_dispatcher::{
-    DispatcherBuilder
-};
+use async_dispatcher::DispatcherBuilder;
 
-use async_dispatcher::support::legion::{
-    create_query
-};
+use async_dispatcher::support::legion::create_query;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Pos(f32, f32, f32);
@@ -21,7 +16,6 @@ struct ResA(f32, f32, f32);
 struct ResB(f32, f32, f32);
 
 fn main() {
-
     let universe = Universe::new(None);
     let mut world = universe.create_world();
 
@@ -50,23 +44,21 @@ fn main() {
     dispatcher.enter_game_loop(move |dispatcher| {
         let world = world.clone();
 
-        create_query::<(Write<Pos>, Read<Vel>)>(dispatcher.clone())
-            .and_then(move |mut x| {
+        create_query::<(Write<Pos>, Read<Vel>)>(dispatcher.clone()).and_then(move |mut x| {
+            let world = world.clone();
+            for (pos, vel) in x.query_mut().iter(&world) {
+                pos.0 += vel.0;
+                pos.1 += vel.1;
+                pos.2 += vel.2;
 
-                let world = world.clone();
-                for (pos, vel) in x.query_mut().iter(&world) {
-                    pos.0 += vel.0;
-                    pos.1 += vel.1;
-                    pos.2 += vel.2;
+                println!("{:?}", pos);
 
-                    println!("{:?}", pos);
-
-                    if pos.0 > 1000. {
-                        dispatcher.end_game_loop();
-                    }
+                if pos.0 > 1000. {
+                    dispatcher.end_game_loop();
                 }
+            }
 
-                Ok(())
-            })
+            Ok(())
+        })
     });
 }

@@ -1,6 +1,5 @@
-
-use std::marker::PhantomData;
 use super::ResourceId;
+use std::marker::PhantomData;
 
 // This is a helper that determines the reads/writes required for a system. I would have preferred
 // not to need this structure at all, but many of the shred types require lifetimes that just
@@ -12,17 +11,17 @@ pub struct RequiredResources<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl<T : RequiresResources> RequiredResources<T> {
+impl<T: RequiresResources> RequiredResources<T> {
     pub fn new() -> Self {
         RequiredResources {
             reads: T::reads(),
             writes: T::writes(),
-            phantom_data: PhantomData
+            phantom_data: PhantomData,
         }
     }
 }
 
-pub trait RequiresResources : Sized {
+pub trait RequiresResources: Sized {
     fn reads() -> Vec<super::ResourceId>;
     fn writes() -> Vec<super::ResourceId>;
 
@@ -32,8 +31,12 @@ pub trait RequiresResources : Sized {
 }
 
 impl RequiresResources for () {
-    fn reads() -> Vec<ResourceId> { vec![] }
-    fn writes() -> Vec<ResourceId> { vec![] }
+    fn reads() -> Vec<ResourceId> {
+        vec![]
+    }
+    fn writes() -> Vec<ResourceId> {
+        vec![]
+    }
 }
 
 macro_rules! impl_data {

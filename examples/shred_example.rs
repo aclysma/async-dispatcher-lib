@@ -1,12 +1,8 @@
-
 use std::sync::Arc;
 
 use async_dispatcher::ExecuteSequential;
 
-use async_dispatcher::support::shred::{
-    ShredDispatcherBuilder,
-    ShredDispatcherContext
-};
+use async_dispatcher::support::shred::{ShredDispatcherBuilder, ShredDispatcherContext};
 
 struct HelloWorldResourceA {
     value: i32,
@@ -39,19 +35,18 @@ impl<'a> shred::System<'a> for HelloWorldSystem {
 }
 
 fn main() {
-
     let dispatcher = ShredDispatcherBuilder::new()
-        .insert(HelloWorldResourceA { value: 5 } )
-        .insert(HelloWorldResourceB { value: 10 } )
+        .insert(HelloWorldResourceA { value: 5 })
+        .insert(HelloWorldResourceB { value: 10 })
         .build();
 
     let _world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
             ctx.run_shred_system(HelloWorldSystem {
-                dispatcher: ctx.clone()
+                dispatcher: ctx.clone(),
             }),
             ctx.run_shred_system(HelloWorldSystem {
-                dispatcher: ctx.clone()
+                dispatcher: ctx.clone(),
             }),
         ])
     });

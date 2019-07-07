@@ -1,51 +1,60 @@
-
 use std::sync::Arc;
 
 use crate::async_dispatcher::{
-    RequiresResources,
-    ResourceId,
-    Dispatcher,
-    AcquiredResourcesLockGuards,
-    AcquireResources
+    AcquireResources, AcquiredResourcesLockGuards, Dispatcher, RequiresResources, ResourceId,
 };
 
 use legion::query::IntoQuery;
 
-impl<T : legion::Component> RequiresResources for legion::query::Read<T> {
-    fn reads() -> Vec<ResourceId>{ vec![ResourceId::new::<T>()] }
-    fn writes() -> Vec<ResourceId> { vec![] }
-}
-
-impl<T : legion::Component> RequiresResources for legion::query::Write<T> {
-    fn reads() -> Vec<ResourceId>{
+impl<T: legion::Component> RequiresResources for legion::query::Read<T> {
+    fn reads() -> Vec<ResourceId> {
+        vec![ResourceId::new::<T>()]
+    }
+    fn writes() -> Vec<ResourceId> {
         vec![]
     }
-    fn writes() -> Vec<ResourceId>{ vec![ResourceId::new::<T>()] }
+}
+
+impl<T: legion::Component> RequiresResources for legion::query::Write<T> {
+    fn reads() -> Vec<ResourceId> {
+        vec![]
+    }
+    fn writes() -> Vec<ResourceId> {
+        vec![ResourceId::new::<T>()]
+    }
 }
 
 pub struct AsyncQuery<T>
-    where T : legion::query::DefaultFilter + for<'a> legion::query::View<'a>
+where
+    T: legion::query::DefaultFilter + for<'a> legion::query::View<'a>,
 {
     _lock_guards: AcquiredResourcesLockGuards<T>,
-    query: legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter>
+    query: legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter>,
 }
 
 impl<T> AsyncQuery<T>
-    where T : legion::query::DefaultFilter + for<'a> legion::query::View<'a>
+where
+    T: legion::query::DefaultFilter + for<'a> legion::query::View<'a>,
 {
-    pub fn query(&self) -> &legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter> {
+    pub fn query(
+        &self,
+    ) -> &legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter> {
         &self.query
     }
 
-    pub fn query_mut(&mut self) -> &mut legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter> {
+    pub fn query_mut(
+        &mut self,
+    ) -> &mut legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter> {
         &mut self.query
     }
 }
 
-pub fn create_query<T>(dispatcher: Arc<Dispatcher>) -> impl futures::future::Future<Item=AsyncQuery<T>, Error=()>
-    where
-        T : RequiresResources,
-        T : legion::query::DefaultFilter + for<'a> legion::query::View<'a>
+pub fn create_query<T>(
+    dispatcher: Arc<Dispatcher>,
+) -> impl futures::future::Future<Item = AsyncQuery<T>, Error = ()>
+where
+    T: RequiresResources,
+    T: legion::query::DefaultFilter + for<'a> legion::query::View<'a>,
 {
     let required_resources = <T as RequiresResources>::required_resources();
     let query = T::query();
@@ -53,11 +62,8 @@ pub fn create_query<T>(dispatcher: Arc<Dispatcher>) -> impl futures::future::Fut
     use futures::future::Future;
 
     //TODO: Try to make this return an iterator as a future result
-    AcquireResources::new(dispatcher, required_resources)
-        .map(|lock_guards| {
-            AsyncQuery {
-                _lock_guards: lock_guards,
-                query
-            }
-        })
+    AcquireResources::new(dispatcher, required_resources).map(|lock_guards| AsyncQuery {
+        _lock_guards: lock_guards,
+        query,
+    })
 }

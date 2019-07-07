@@ -9,27 +9,27 @@ use mopa::Any;
 use std::marker::PhantomData;
 
 mod trust_cell;
-use trust_cell::TrustCell;
 use trust_cell::Ref;
 use trust_cell::RefMut;
+use trust_cell::TrustCell;
 
 //
 // ResourceId
 //
-use std::any::TypeId;
 use crate::async_dispatcher::RequiresResources;
+use std::any::TypeId;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ResourceId {
-    type_id: TypeId
+    type_id: TypeId,
 }
 
 impl ResourceId {
     /// Creates a new resource id from a given type.
     #[inline]
-    pub fn new<T : 'static>() -> Self {
+    pub fn new<T: 'static>() -> Self {
         ResourceId {
-            type_id: std::any::TypeId::of::<T>()
+            type_id: std::any::TypeId::of::<T>(),
         }
     }
 }
@@ -62,34 +62,34 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         World {
-            resources: HashMap::new()
+            resources: HashMap::new(),
         }
     }
 
     pub fn insert<R>(&mut self, r: R)
-        where
-            R: Resource,
+    where
+        R: Resource,
     {
         self.insert_by_id(ResourceId::new::<R>(), r);
     }
 
     pub fn remove<R>(&mut self) -> Option<R>
-        where
-            R: Resource,
+    where
+        R: Resource,
     {
         self.remove_by_id(ResourceId::new::<R>())
     }
 
     fn insert_by_id<R>(&mut self, id: ResourceId, r: R)
-        where
-            R: Resource,
+    where
+        R: Resource,
     {
         self.resources.insert(id, TrustCell::new(Box::new(r)));
     }
 
     fn remove_by_id<R>(&mut self, id: ResourceId) -> Option<R>
-        where
-            R: Resource,
+    where
+        R: Resource,
     {
         self.resources
             .remove(&id)
@@ -99,11 +99,11 @@ impl World {
             .map(|x| *x)
     }
 
-    fn fetch<R : Resource>(&self) -> ReadBorrow<R> {
+    fn fetch<R: Resource>(&self) -> ReadBorrow<R> {
         self.try_fetch().unwrap()
     }
 
-    fn try_fetch<R : Resource>(&self) -> Option<ReadBorrow<R>> {
+    fn try_fetch<R: Resource>(&self) -> Option<ReadBorrow<R>> {
         let res_id = ResourceId::new::<R>();
 
         self.resources.get(&res_id).map(|r| ReadBorrow {
@@ -112,11 +112,11 @@ impl World {
         })
     }
 
-    fn fetch_mut<R : Resource>(&self) -> WriteBorrow<R> {
+    fn fetch_mut<R: Resource>(&self) -> WriteBorrow<R> {
         self.try_fetch_mut().unwrap()
     }
 
-    fn try_fetch_mut<R : Resource>(&self) -> Option<WriteBorrow<R>> {
+    fn try_fetch_mut<R: Resource>(&self) -> Option<WriteBorrow<R>> {
         let res_id = ResourceId::new::<R>();
 
         self.resources.get(&res_id).map(|r| WriteBorrow::<R> {
@@ -130,7 +130,7 @@ impl World {
 // DataRequirement base trait
 //
 pub trait DataRequirement<'a> {
-    type Borrow : DataBorrow;
+    type Borrow: DataBorrow;
 
     fn fetch(world: &'a World) -> Self::Borrow;
 }
@@ -138,17 +138,17 @@ pub trait DataRequirement<'a> {
 impl<'a> DataRequirement<'a> for () {
     type Borrow = ();
 
-    fn fetch(_: &'a World) -> Self::Borrow { }
+    fn fetch(_: &'a World) -> Self::Borrow {}
 }
 
 //
 // Read
 //
-pub struct Read<T : Resource> {
-    phantom_data: PhantomData<T>
+pub struct Read<T: Resource> {
+    phantom_data: PhantomData<T>,
 }
 
-impl<'a, T : Resource> DataRequirement<'a> for Read<T> {
+impl<'a, T: Resource> DataRequirement<'a> for Read<T> {
     type Borrow = ReadBorrow<'a, T>;
 
     fn fetch(world: &'a World) -> Self::Borrow {
@@ -159,11 +159,11 @@ impl<'a, T : Resource> DataRequirement<'a> for Read<T> {
 //
 // Write
 //
-pub struct Write<T : Resource> {
-    phantom_data: PhantomData<T>
+pub struct Write<T: Resource> {
+    phantom_data: PhantomData<T>,
 }
 
-impl<'a, T : Resource> DataRequirement<'a> for Write<T> {
+impl<'a, T: Resource> DataRequirement<'a> for Write<T> {
     type Borrow = WriteBorrow<'a, T>;
 
     fn fetch(world: &'a World) -> Self::Borrow {
@@ -174,13 +174,9 @@ impl<'a, T : Resource> DataRequirement<'a> for Write<T> {
 //
 // Borrow base trait
 //
-pub trait DataBorrow {
+pub trait DataBorrow {}
 
-}
-
-impl DataBorrow for () {
-
-}
+impl DataBorrow for () {}
 
 //
 // ReadBorrow
@@ -190,13 +186,11 @@ pub struct ReadBorrow<'a, T> {
     phantom: PhantomData<&'a T>,
 }
 
-impl<'a, T> DataBorrow for ReadBorrow<'a, T> {
-
-}
+impl<'a, T> DataBorrow for ReadBorrow<'a, T> {}
 
 impl<'a, T> std::ops::Deref for ReadBorrow<'a, T>
-    where
-        T: Resource,
+where
+    T: Resource,
 {
     type Target = T;
 
@@ -222,13 +216,11 @@ pub struct WriteBorrow<'a, T> {
     phantom: PhantomData<&'a mut T>,
 }
 
-impl<'a, T> DataBorrow for WriteBorrow<'a, T> {
-
-}
+impl<'a, T> DataBorrow for WriteBorrow<'a, T> {}
 
 impl<'a, T> std::ops::Deref for WriteBorrow<'a, T>
-    where
-        T: Resource,
+where
+    T: Resource,
 {
     type Target = T;
 
@@ -238,8 +230,8 @@ impl<'a, T> std::ops::Deref for WriteBorrow<'a, T>
 }
 
 impl<'a, T> std::ops::DerefMut for WriteBorrow<'a, T>
-    where
-        T: Resource,
+where
+    T: Resource,
 {
     fn deref_mut(&mut self) -> &mut T {
         unsafe { self.inner.downcast_mut_unchecked() }
@@ -249,11 +241,8 @@ impl<'a, T> std::ops::DerefMut for WriteBorrow<'a, T>
 //
 // Task
 //
-pub trait Task
-    where
-{
-    type RequiredResources : for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
-
+pub trait Task {
+    type RequiredResources: for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
 
     fn run(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow);
 }
