@@ -6,21 +6,37 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["minimum"]
+minimum = ["mopa"]
+
 [dependencies]
 log = "0.4"
 hashbrown = "0.5.0"
 futures = "0.1"
 tokio = "0.1"
 
+# minimum support
+mopa = { version = "0.2", optional = true }
+
 # legion support (requires this one-line patch):
 # a/src/storage.rs
 #-trait ComponentStorage: Downcast + Debug {
 #+trait ComponentStorage: Downcast + Debug + Send {
 # This fork has the patch applied
-legion = { git = 'https://github.com/aclysma/legion.git' }
+legion = { git = 'https://github.com/aclysma/legion.git', optional = true }
 
 # shred support
-shred = "0.9.2"
+shred = { version = "0.9.2", optional = true }
 
-# minimum support
-mopa = "0.2"
+[[example]]
+name = "minimum_example"
+required-features = ["minimum"]
+
+[[example]]
+name = "legion_example"
+required-features = ["legion"]
+
+[[example]]
+name = "shred_example"
+required-features = ["shred"]

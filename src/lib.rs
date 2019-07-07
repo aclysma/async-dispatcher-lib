@@ -3,6 +3,8 @@
 extern crate log;
 
 pub mod async_dispatcher;
+
+#[cfg(feature = "minimum")]
 pub mod minimum;
 
 pub use async_dispatcher::AcquireResources;

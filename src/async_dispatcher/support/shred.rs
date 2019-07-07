@@ -100,6 +100,8 @@ impl ShredDispatcherContext {
         self.world.clone()
     }
 
+    //TODO: Was able to get MinimumDispatcherContext to do this in a cleaner way, might be able to
+    // improve this to avoid unsafe code
     pub fn run_shred_system<T>(
         &self,
         system: T
