@@ -210,7 +210,10 @@ impl MinimumDispatcherContext {
         Box::new(
             acquire_resources::<T::RequiredResources>(self.dispatcher.clone(), self.world.clone())
                 .and_then(move |acquired_resources| {
-                    task.run(acquired_resources);
+                    acquired_resources.visit(move |resources| {
+                        task.run2(resources);
+                    });
+
                     Ok(())
                 })
         )
