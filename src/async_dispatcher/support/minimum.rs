@@ -47,7 +47,7 @@ impl<T> AcquiredResources<T>
         (f)(fetched);
     }
 
-    //TODO: Try a normal fetch API
+    //TODO: Could experiment with an api more like fetch from shred
 }
 
 //

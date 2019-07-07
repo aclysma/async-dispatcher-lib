@@ -52,7 +52,7 @@ pub fn create_query<T>(dispatcher: Arc<Dispatcher>) -> impl futures::future::Fut
 
     use futures::future::Future;
 
-    //TODO: Start here, try to make this return an iterator as a future result
+    //TODO: Try to make this return an iterator as a future result
     AcquireResources::new(dispatcher, required_resources)
         .map(|lock_guards| {
             AsyncQuery {
