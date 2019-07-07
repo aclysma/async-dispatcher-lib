@@ -1,7 +1,15 @@
 
 use std::sync::Arc;
 
-use crate::minimum::{World, Read, Write, DataBorrow, DataRequirement};
+use crate::minimum::{
+    World,
+    Read,
+    Write,
+    DataBorrow,
+    DataRequirement,
+    ReadBorrow,
+    WriteBorrow
+};
 
 use crate::async_dispatcher::{
     DispatcherBuilder,
@@ -20,11 +28,11 @@ struct HelloWorldResourceB {
     value: i32,
 }
 
-fn acquire_resources_and_use<F, RequirementT>(
+fn acquire_resources_and_use<RequirementT, F>(
     dispatcher: Arc<Dispatcher>,
     world: Arc<World>,
     f: F
-) -> Box<futures::future::Future<Item=(), Error=()>>
+) -> Box<impl futures::future::Future<Item=(), Error=()>>
     where
         RequirementT: RequiresResources + 'static + Send,
         F : Fn(AcquiredResources<RequirementT>) + 'static,
@@ -33,12 +41,51 @@ fn acquire_resources_and_use<F, RequirementT>(
 
     Box::new(
         acquire_resources::<RequirementT>(dispatcher.clone(), world.clone())
-        .and_then(move |acquired_resources| {
+
+            //TODO: Both and_then and map work, not sure why or if one is better than the other
+
+//        .and_then(move |acquired_resources| {
+//            (f)(acquired_resources);
+//            Ok(())
+//        })
+
+        .map(move |acquired_resources| {
             (f)(acquired_resources);
-            Ok(())
         })
     )
 }
+
+
+fn acquire_resources_and_visit<RequirementT, F>(
+    dispatcher: Arc<Dispatcher>,
+    world: Arc<World>,
+    f: F
+) -> Box<impl futures::future::Future<Item=(), Error=()>>
+    where
+        RequirementT: RequiresResources + 'static + Send,
+        RequirementT: for<'a> DataRequirement<'a>,
+        //F : Fn(AcquiredResources<RequirementT>) + 'static,
+        F : for<'a> FnOnce(<RequirementT as DataRequirement<'a>>::Borrow)
+{
+    use futures::future::Future;
+
+    Box::new(
+        acquire_resources::<RequirementT>(dispatcher.clone(), world.clone())
+
+            //TODO: Both and_then and map work, not sure why or if one is better than the other
+
+//        .and_then(move |acquired_resources| {
+//            (f)(acquired_resources);
+//            Ok(())
+//        })
+
+            .map(move |acquired_resources| {
+                //(f)(acquired_resources);
+                acquired_resources.visit(f);
+            })
+    )
+}
+
 
 fn example_fn2(resources: AcquiredResources<(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>) {
     resources.visit(|r| {
@@ -46,6 +93,8 @@ fn example_fn2(resources: AcquiredResources<(Read<HelloWorldResourceA>, Write<He
         b.value += 1;
     })
 }
+
+
 
 type ExampleFn3Args = (Read<HelloWorldResourceA>, Write<HelloWorldResourceB>);
 fn example_fn3(resources: AcquiredResources<ExampleFn3Args>) {
@@ -62,26 +111,22 @@ fn example_fn(resources: AcquiredResources<Write<HelloWorldResourceB>>) {
         b.value += 1;
     })
 }
+//
+//
+//type ExampleFn3ArgsBorrow = ExampleFn3Args::Borrow;
+//fn example_fn_2(borrow: ExampleFn3ArgsBorrow) {
+//
+//}
 
-fn acquire<F, T>(
-    dispatcher: Arc<Dispatcher>,
-    world: Arc<World>,
-    f: F
-) -> Box<impl futures::future::Future<Item=(), Error=()>>
-where
-    F: Fn(AcquiredResources<T>) + 'static,
-    T : RequiresResources + 'static + Send
-{
-    use futures::future::Future;
-
-    Box::new(
-        acquire_resources::<T>(dispatcher, world)
-            //.map(|_| ())
-            .map(move |x| {
-                (f)(x);
-            })
-    )
+fn example_fn_borrow(resources: (ReadBorrow<HelloWorldResourceA>, WriteBorrow<HelloWorldResourceB>)) {
+    let (a, mut b) = resources;
+    b.value += 1;
 }
+
+//fn example_fn_borrow2(resources: <(ReadBorrow<HelloWorldResourceA>, WriteBorrow<HelloWorldResourceB>)>) {
+//    let (a, mut b) = resources;
+//    b.value += 1;
+//}
 
 
 pub fn minimum_example() {
@@ -118,34 +163,44 @@ pub fn minimum_example() {
             ),
             */
 
-            acquire(dispatcher.clone(), world.clone(), example_fn),
-            acquire(dispatcher.clone(), world.clone(), example_fn),
-            acquire(dispatcher.clone(), world.clone(), example_fn),
+            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn),
+            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn2),
+            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn3),
 
-            //acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn),
 
-//            acquire_resources_and_use::<_, <(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)> >(
-//                dispatcher.clone(),
-//                world.clone(),
-//                move |acquired_resources| {
-//
-//                }
-//            ),
 
-            /*
-            Box::new(acquire_resources::<(Read<HelloWorldResourceB>)>(dispatcher.clone(), world.clone())
-                .and_then(move |acquired_resources| {
-                    acquired_resources.visit(|data| {
-                        let (b) = data;
+            acquire_resources_and_use(
+                dispatcher.clone(),
+                world.clone(),
+                |resources: AcquiredResources<(
+                    Read<HelloWorldResourceA>,
+                    Write<HelloWorldResourceB>
+                )>| {
+                    resources.visit(|res| {
+                        let (a, mut b) = res;
+                        println!("a {}", a.value);
+                    })
+                }
+            ),
+/*
+            acquire_resources_and_visit(
+                dispatcher.clone(),
+                world.clone(),
+                |resources: (
+                    ReadBorrow<HelloWorldResourceA>,
+                    WriteBorrow<HelloWorldResourceB>
+                )| {
+                    let (a, mut b) = resources;
+                    println!("a {}", a.value);
+                }
+            ),
+*/
 
-                        if b.value > 10000 {
-                            dispatcher.end_game_loop();
-                        }
-                    });
-                    Ok(())
-                })
-            )
-            */
+            acquire_resources_and_visit(
+                dispatcher.clone(),
+                world.clone(),
+                example_fn_borrow
+            ),
         ])
 
     })
