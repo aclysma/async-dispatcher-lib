@@ -13,6 +13,8 @@ use trust_cell::RefMut;
 // ResourceId
 //
 use std::any::TypeId;
+use crate::async_dispatcher::minimum::AcquiredResources;
+use crate::async_dispatcher::RequiresResources;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ResourceId {
@@ -294,3 +296,18 @@ mod impl_data {
     //TODO: More of these
 }
 
+
+
+//
+// Task
+//
+pub trait Task
+where
+{
+    type RequiredResources : for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
+
+
+    fn run(&mut self, data: AcquiredResources<Self::RequiredResources>);
+
+    fn run2(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow);
+}

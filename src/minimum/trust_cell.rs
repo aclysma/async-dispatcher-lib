@@ -1,3 +1,12 @@
+// This is originally from the shred project. No changes, just didn't want to pull in all of shred
+// and it's dependencies.
+//
+// Original source available on github: https://github.com/slide-rs/shred
+//
+// shred is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
+//
+// See LICENSE-APACHE and LICENSE-MIT.
+
 //! Helper module for some internals, most users don't need to interact with it.
 
 use std::{

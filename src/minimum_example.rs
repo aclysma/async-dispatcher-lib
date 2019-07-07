@@ -8,20 +8,17 @@ use crate::minimum::{
     DataBorrow,
     DataRequirement,
     ReadBorrow,
-    WriteBorrow
+    WriteBorrow,
+    Task
 };
 
 use crate::async_dispatcher::{
-    DispatcherBuilder,
-    Dispatcher,
     ExecuteSequential,
     RequiresResources,
-    minimum::acquire_resources,
-    minimum::MinimumDispatcherBuilder,
-    minimum::MinimumDispatcher
+    minimum
 };
 
-use crate::async_dispatcher::minimum::AcquiredResources;
+use crate::async_dispatcher::minimum::{AcquiredResources, MinimumDispatcherContext};
 
 struct HelloWorldResourceA {
     value: i32,
@@ -31,6 +28,7 @@ struct HelloWorldResourceB {
     value: i32,
 }
 
+// Functions can be declared like this
 fn example_inline(resources: AcquiredResources<(
     Read<HelloWorldResourceA>,
     Write<HelloWorldResourceB>
@@ -41,14 +39,16 @@ fn example_inline(resources: AcquiredResources<(
     })
 }
 
-type ExampleFn3Args = (Read<HelloWorldResourceA>, Write<HelloWorldResourceB>);
-fn example_typedef(resources: AcquiredResources<ExampleFn3Args>) {
+// It may be more convenient to pull the args out seperately
+type ExampleTypedefArgs = (Read<HelloWorldResourceA>, Write<HelloWorldResourceB>);
+fn example_typedef(resources: AcquiredResources<ExampleTypedefArgs>) {
     resources.visit(|r| {
         let (a, mut b) = r;
         b.value += 1;
     })
 }
 
+// If you only need a single resource, you don't need to use a tuple
 fn example_single_resource(resources: AcquiredResources<Write<HelloWorldResourceB>>) {
     resources.visit(|mut b| {
         println!("hi");
@@ -56,9 +56,38 @@ fn example_single_resource(resources: AcquiredResources<Write<HelloWorldResource
     })
 }
 
+struct ExampleTask {
+    ctx: Arc<MinimumDispatcherContext>,
+}
+
+impl Task for ExampleTask {
+    type RequiredResources = (
+        Read<HelloWorldResourceA>,
+        Write<HelloWorldResourceB>,
+    );
+
+    fn run(&mut self, data: AcquiredResources<Self::RequiredResources>) {
+        data.visit(|data| {
+            let (a, mut b) = data;
+
+            println!("Hello World a: {:?} b: {:?}", a.value, b.value);
+            b.value += 1;
+
+            if b.value > 200 {
+                self.ctx.end_game_loop();
+            }
+        })
+    }
+
+    fn run2(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow) {
+        let (a, mut b) = data;
+        println!("Hello World a: {:?} b: {:?}", a.value, b.value);
+    }
+}
+
 pub fn minimum_example() {
 
-    let dispatcher = MinimumDispatcherBuilder::new()
+    let dispatcher = minimum::MinimumDispatcherBuilder::new()
         .insert(HelloWorldResourceA { value: 5 } )
         .insert(HelloWorldResourceB { value: 10 } )
         .build();
@@ -67,11 +96,12 @@ pub fn minimum_example() {
 
     let world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
+            // Demo of three different styles
             ctx.run(example_inline),
             ctx.run(example_typedef),
             ctx.run(example_single_resource),
 
-            // Closure is still possible
+            // It's possible to use callbacks as well
             ctx.run(
                 |resources: AcquiredResources<(
                     Read<HelloWorldResourceA>,
@@ -82,7 +112,11 @@ pub fn minimum_example() {
                         println!("a {}", a.value);
                     })
                 }
-            )
+            ),
+
+            ctx.run_task(ExampleTask { ctx: ctx.clone() }),
+
+            ctx.run_task2(ExampleTask { ctx: ctx.clone() })
         ])
     });
 }

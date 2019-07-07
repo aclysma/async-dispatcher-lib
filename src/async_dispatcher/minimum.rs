@@ -180,66 +180,39 @@ impl MinimumDispatcherContext {
         )
     }
 
-/*
-    pub fn run_shred_system<T>(
+    pub fn run_task<T>(
         &self,
-        mut system: T
+        mut task: T
     ) -> Box<impl futures::future::Future<Item=(), Error=()>>
         where
-            T : shred::System<'static> + 'static,
-            <T as shred::System<'static>>::SystemData: RequiresResources
+            T: minimum::Task,
     {
         use futures::future::Future;
 
-        let required_resources = <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
-
-        //let dispatcher = self.dispatcher.clone();
-        let world = self.world.clone();
-
-        Box::new(crate::async_dispatcher::AcquireResources::new(self.dispatcher.clone(), required_resources)
-            .and_then(move |guards| {
-
-                //SAFETY:
-                // We now have exclusive ownership of the system, and an Arc to the world. Therefore,
-                // both will live for the lifetime of this function. Additionally, the mutable system
-                // is not returned, so it can't accidentally hold a raw reference to anything from the world
-                let world = world;
-                let mut system = system;
-
-                unsafe {
-                    let sys : &mut T = &mut system;
-                    let sys : &'static mut T = std::mem::transmute(sys);
-
-                    let world : &shred::World = &world;
-                    let world : &'static shred::World = std::mem::transmute(world);
-
-                    use shred::RunNow;
-                    sys.run_now(&world);
-                }
-
-                Ok(())
-            }))
+        Box::new(
+            acquire_resources::<T::RequiredResources>(self.dispatcher.clone(), self.world.clone())
+                .and_then(move |acquired_resources| {
+                    task.run(acquired_resources);
+                    Ok(())
+                })
+        )
     }
-    */
-}
 
+    pub fn run_task2<T>(
+        &self,
+        mut task: T
+    ) -> Box<impl futures::future::Future<Item=(), Error=()>>
+        where
+            T: minimum::Task,
+    {
+        use futures::future::Future;
 
-
-fn acquire_resources_and_use<RequirementT, F>(
-    dispatcher: Arc<Dispatcher>,
-    world: Arc<minimum::World>,
-    f: F
-) -> Box<impl futures::future::Future<Item=(), Error=()>>
-    where
-        RequirementT: RequiresResources + 'static + Send,
-        F : Fn(AcquiredResources<RequirementT>) + 'static,
-{
-    use futures::future::Future;
-
-    Box::new(
-        acquire_resources::<RequirementT>(dispatcher.clone(), world.clone())
-            .map(move |acquired_resources| {
-                (f)(acquired_resources);
-            })
-    )
+        Box::new(
+            acquire_resources::<T::RequiredResources>(self.dispatcher.clone(), self.world.clone())
+                .and_then(move |acquired_resources| {
+                    task.run(acquired_resources);
+                    Ok(())
+                })
+        )
+    }
 }
