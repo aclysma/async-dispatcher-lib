@@ -56,16 +56,16 @@ fn acquire_resources_and_use<RequirementT, F>(
 }
 
 
-fn acquire_resources_and_visit<RequirementT, F>(
+fn acquire_resources_and_visit<'a, RequirementT, F>(
     dispatcher: Arc<Dispatcher>,
     world: Arc<World>,
     f: F
 ) -> Box<impl futures::future::Future<Item=(), Error=()>>
     where
         RequirementT: RequiresResources + 'static + Send,
-        RequirementT: for<'a> DataRequirement<'a>,
+        RequirementT: DataRequirement<'a>,
         //F : Fn(AcquiredResources<RequirementT>) + 'static,
-        F : for<'a> FnOnce(<RequirementT as DataRequirement<'a>>::Borrow)
+        F : FnOnce(<RequirementT as DataRequirement<'a>>::Borrow)
 {
     use futures::future::Future;
 
@@ -149,26 +149,13 @@ pub fn minimum_example() {
 
 
         ExecuteSequential::new(vec![
-            /*
-            Box::new(acquire_resources::<(Read<HelloWorldResourceA>, Write<HelloWorldResourceB>)>(dispatcher.clone(), world.clone())
-                .and_then(move |acquired_resources| {
-                    acquired_resources.visit(|data| {
-                        let (a, mut b) = data;
-                        println!("value {}", a.value);
-                        println!("value {}", b.value);
-                        b.value += 5;
-                    });
-                    Ok(())
-                })
-            ),
-            */
 
+            // Clean way
             acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn),
             acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn2),
             acquire_resources_and_use(dispatcher.clone(), world.clone(), example_fn3),
 
-
-
+            // Closure is still possible
             acquire_resources_and_use(
                 dispatcher.clone(),
                 world.clone(),
@@ -182,7 +169,10 @@ pub fn minimum_example() {
                     })
                 }
             ),
-/*
+
+
+
+
             acquire_resources_and_visit(
                 dispatcher.clone(),
                 world.clone(),
@@ -194,13 +184,14 @@ pub fn minimum_example() {
                     println!("a {}", a.value);
                 }
             ),
-*/
 
+/*
             acquire_resources_and_visit(
                 dispatcher.clone(),
                 world.clone(),
                 example_fn_borrow
             ),
+            */
         ])
 
     })
