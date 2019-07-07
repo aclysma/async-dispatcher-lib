@@ -26,7 +26,7 @@ impl<T : legion::Component> RequiresResources for legion::query::Write<T> {
 pub struct AsyncQuery<T>
     where T : legion::query::DefaultFilter + for<'a> legion::query::View<'a>
 {
-    lock_guards: AcquiredResourcesLockGuards<T>,
+    _lock_guards: AcquiredResourcesLockGuards<T>,
     query: legion::query::QueryDef<T, <T as legion::query::DefaultFilter>::Filter>
 }
 
@@ -47,8 +47,6 @@ pub fn create_query<T>(dispatcher: Arc<Dispatcher>) -> impl futures::future::Fut
         T : RequiresResources,
         T : legion::query::DefaultFilter + for<'a> legion::query::View<'a>
 {
-    use crate::async_dispatcher::RequiresResources;
-
     let required_resources = <T as RequiresResources>::required_resources();
     let query = T::query();
 
@@ -58,7 +56,7 @@ pub fn create_query<T>(dispatcher: Arc<Dispatcher>) -> impl futures::future::Fut
     AcquireResources::new(dispatcher, required_resources)
         .map(|lock_guards| {
             AsyncQuery {
-                lock_guards,
+                _lock_guards: lock_guards,
                 query
             }
         })

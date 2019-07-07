@@ -11,7 +11,6 @@ use crate::async_dispatcher::{
 };
 
 use crate::minimum;
-use crate::minimum::DataRequirement;
 
 //
 // Hook up Read/Write to the resource system
@@ -32,7 +31,7 @@ impl<T : minimum::Resource> RequiresResources for minimum::Write<T> {
 pub struct AcquiredResources<T>
     where T : RequiresResources + 'static + Send
 {
-    lock_guards: AcquiredResourcesLockGuards<T>,
+    _lock_guards: AcquiredResourcesLockGuards<T>,
     world: Arc<minimum::World>
 }
 
@@ -62,7 +61,7 @@ pub fn acquire_resources<T>(dispatcher: Arc<Dispatcher>, world: Arc<minimum::Wor
     Box::new(AcquireResources::new(dispatcher, T::required_resources())
         .map(move |lock_guards| {
             AcquiredResources {
-                lock_guards,
+                _lock_guards: lock_guards,
                 world
             }
         }))

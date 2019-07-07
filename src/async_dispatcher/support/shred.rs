@@ -3,7 +3,6 @@ use crate::async_dispatcher::{RequiresResources, Dispatcher};
 use crate::async_dispatcher::ResourceId;
 use crate::async_dispatcher::DispatcherBuilder;
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<'a, T : shred::Resource> RequiresResources for shred::ReadExpect<'a, T> {
@@ -103,7 +102,7 @@ impl ShredDispatcherContext {
 
     pub fn run_shred_system<T>(
         &self,
-        mut system: T
+        system: T
     ) -> Box<impl futures::future::Future<Item=(), Error=()>>
         where
             T : shred::System<'static> + 'static,
@@ -117,7 +116,7 @@ impl ShredDispatcherContext {
         let world = self.world.clone();
 
         Box::new(crate::async_dispatcher::AcquireResources::new(self.dispatcher.clone(), required_resources)
-            .and_then(move |guards| {
+            .and_then(move |_guards| {
 
                 //SAFETY:
                 // We now have exclusive ownership of the system, and an Arc to the world. Therefore,

@@ -3,15 +3,11 @@ use legion::prelude::*;
 
 use std::sync::Arc;
 
-use crate::async_dispatcher::{
-    RequiresResources,
-    Dispatcher,
-    DispatcherBuilder,
-    AcquireResources,
-    AcquiredResourcesLockGuards
+use async_dispatcher::{
+    DispatcherBuilder
 };
 
-use crate::async_dispatcher::legion::{
+use async_dispatcher::support::legion::{
     create_query
 };
 
@@ -24,7 +20,7 @@ struct ResA(f32, f32, f32);
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct ResB(f32, f32, f32);
 
-pub fn legion_example() {
+fn main() {
 
     let universe = Universe::new(None);
     let mut world = universe.create_world();
@@ -62,6 +58,12 @@ pub fn legion_example() {
                     pos.0 += vel.0;
                     pos.1 += vel.1;
                     pos.2 += vel.2;
+
+                    println!("{:?}", pos);
+
+                    if pos.0 > 1000. {
+                        dispatcher.end_game_loop();
+                    }
                 }
 
                 Ok(())

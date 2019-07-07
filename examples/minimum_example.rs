@@ -1,20 +1,20 @@
 
 use std::sync::Arc;
 
-use crate::minimum::{
+use async_dispatcher::minimum::{
     Read,
     Write,
     DataRequirement,
     Task
 };
 
-use crate::async_dispatcher::minimum::{
+use async_dispatcher::support::minimum::{
     AcquiredResources,
     MinimumDispatcherBuilder,
     MinimumDispatcherContext
 };
 
-use crate::async_dispatcher::ExecuteSequential;
+use async_dispatcher::ExecuteSequential;
 
 struct HelloWorldResourceA {
     value: i32,
@@ -30,7 +30,7 @@ fn example_inline(resources: AcquiredResources<(
     Write<HelloWorldResourceB>
 )>) {
     resources.visit(|r| {
-        let (a, mut b) = r;
+        let (_a, mut b) = r;
         b.value += 1;
     })
 }
@@ -56,16 +56,14 @@ impl Task for ExampleTask {
     }
 }
 
-pub fn minimum_example() {
+fn main() {
 
     let dispatcher = MinimumDispatcherBuilder::new()
         .insert(HelloWorldResourceA { value: 5 } )
         .insert(HelloWorldResourceB { value: 10 } )
         .build();
 
-    use futures::future::Future;
-
-    let world = dispatcher.enter_game_loop(move |ctx| {
+    let _world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
             // Demo of three different styles
             ctx.run_fn(example_inline),
@@ -78,6 +76,7 @@ pub fn minimum_example() {
                 )>| {
                     resources.visit(|res| {
                         let (a, mut b) = res;
+                        b.value += a.value;
                         println!("a {}", a.value);
                     })
                 }

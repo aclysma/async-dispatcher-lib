@@ -1,14 +1,9 @@
 
-
 use std::sync::Arc;
 
-use crate::async_dispatcher::{
-    ExecuteSequential,
-    RequiresResources
-};
+use async_dispatcher::ExecuteSequential;
 
-use crate::async_dispatcher::shred::{
-    ShredDispatcher,
+use async_dispatcher::support::shred::{
     ShredDispatcherBuilder,
     ShredDispatcherContext
 };
@@ -43,16 +38,14 @@ impl<'a> shred::System<'a> for HelloWorldSystem {
     }
 }
 
-pub fn shred_example() {
+fn main() {
 
     let dispatcher = ShredDispatcherBuilder::new()
         .insert(HelloWorldResourceA { value: 5 } )
         .insert(HelloWorldResourceB { value: 10 } )
         .build();
 
-    use futures::future::Future;
-
-    let world = dispatcher.enter_game_loop(move |ctx| {
+    let _world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
             ctx.run_shred_system(HelloWorldSystem {
                 dispatcher: ctx.clone()

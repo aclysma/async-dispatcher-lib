@@ -298,6 +298,7 @@ impl<T> TrustCell<T> {
     ///
     /// Absence of write accesses is checked at run-time. If access is not
     /// possible, an error is returned.
+    #[allow(dead_code)]
     pub fn try_borrow(&self) -> Result<Ref<T>, InvalidBorrow> {
         self.check_flag_read()?;
 
@@ -327,7 +328,8 @@ impl<T> TrustCell<T> {
     /// Get a mutable reference to the inner data.
     ///
     /// Exclusive access is checked at run-time. If access is not possible, an
-    /// error is returned.
+    /// error is returned.#
+    #[allow(dead_code)]
     pub fn try_borrow_mut(&self) -> Result<RefMut<T>, InvalidBorrow> {
         self.check_flag_write()?;
 
@@ -340,6 +342,7 @@ impl<T> TrustCell<T> {
     /// Gets exclusive access to the inner value, bypassing the Cell.
     ///
     /// Exclusive access is checked at compile time.
+    #[allow(dead_code)]
     pub fn get_mut(&mut self) -> &mut T {
         // safe because we have exclusive access via &mut self
         unsafe { &mut *self.inner.get() }

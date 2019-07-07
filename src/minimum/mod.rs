@@ -17,7 +17,6 @@ use trust_cell::RefMut;
 // ResourceId
 //
 use std::any::TypeId;
-use crate::async_dispatcher::minimum::AcquiredResources;
 use crate::async_dispatcher::RequiresResources;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -34,7 +33,6 @@ impl ResourceId {
         }
     }
 }
-
 
 //
 // Resource
@@ -128,12 +126,6 @@ impl World {
     }
 }
 
-
-
-
-
-
-
 //
 // DataRequirement base trait
 //
@@ -178,7 +170,6 @@ impl<'a, T : Resource> DataRequirement<'a> for Write<T> {
         world.fetch_mut::<T>()
     }
 }
-
 
 //
 // Borrow base trait
