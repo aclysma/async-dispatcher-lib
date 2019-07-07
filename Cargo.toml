@@ -12,12 +12,12 @@ hashbrown = "0.5.0"
 futures = "0.1"
 tokio = "0.1"
 
-# legion support (requires this patch):
-#
+# legion support (requires this one-line patch):
 # a/src/storage.rs
 #-trait ComponentStorage: Downcast + Debug {
 #+trait ComponentStorage: Downcast + Debug + Send {
-legion = { path = '/Users/philipd/dev/rust/legion' }
+# This fork has the patch applied
+legion = { git = 'https://github.com/aclysma/legion.git' }
 
 # shred support
 shred = "0.9.2"
