@@ -56,6 +56,24 @@ fn example_single_resource(resources: AcquiredResources<Write<HelloWorldResource
     })
 }
 
+fn example_inline2(resources: <(
+    Read<HelloWorldResourceA>,
+    Write<HelloWorldResourceB>
+) as DataRequirement>::Borrow
+) {
+    let (a, mut b) = resources;
+    b.value += 1;
+}
+
+fn example_inline3<'a>(resources: (
+    ReadBorrow<'a, HelloWorldResourceA>,
+    WriteBorrow<'a, HelloWorldResourceB>
+)
+) {
+    let (a, mut b) = resources;
+    b.value += 1;
+}
+
 struct ExampleTask {
     ctx: Arc<MinimumDispatcherContext>,
 }
@@ -66,22 +84,14 @@ impl Task for ExampleTask {
         Write<HelloWorldResourceB>,
     );
 
-    fn run(&mut self, data: AcquiredResources<Self::RequiredResources>) {
-        data.visit(|data| {
-            let (a, mut b) = data;
-
-            println!("Hello World a: {:?} b: {:?}", a.value, b.value);
-            b.value += 1;
-
-            if b.value > 200 {
-                self.ctx.end_game_loop();
-            }
-        })
-    }
-
-    fn run2(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow) {
+    fn run(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow) {
         let (a, mut b) = data;
         println!("Hello World a: {:?} b: {:?}", a.value, b.value);
+        b.value += 1;
+
+        if b.value > 200 {
+            self.ctx.end_game_loop();
+        }
     }
 }
 
@@ -97,12 +107,14 @@ pub fn minimum_example() {
     let world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
             // Demo of three different styles
-            ctx.run(example_inline),
-            ctx.run(example_typedef),
-            ctx.run(example_single_resource),
+            ctx.run_fn(example_inline),
+            ctx.run_fn2(example_inline2),
+            //ctx.run_fn2(example_inline3),
+            ctx.run_fn(example_typedef),
+            ctx.run_fn(example_single_resource),
 
             // It's possible to use callbacks as well
-            ctx.run(
+            ctx.run_fn(
                 |resources: AcquiredResources<(
                     Read<HelloWorldResourceA>,
                     Write<HelloWorldResourceB>
@@ -114,9 +126,7 @@ pub fn minimum_example() {
                 }
             ),
 
-            ctx.run_task(ExampleTask { ctx: ctx.clone() }),
-
-            ctx.run_task2(ExampleTask { ctx: ctx.clone() })
+            ctx.run_task(ExampleTask { ctx: ctx.clone() })
         ])
     });
 }

@@ -9,17 +9,9 @@ use crate::async_dispatcher::{
     AcquiredResourcesLockGuards,
     AcquireResources
 };
-/*
-use crate::minimum::{
-    World,
-    Read,
-    Write,
-    Resource,
-    DataRequirement
-};
-*/
 
 use crate::minimum;
+use crate::minimum::DataRequirement;
 
 //
 // Hook up Read/Write to the resource system
@@ -162,7 +154,7 @@ impl MinimumDispatcherContext {
         self.world.clone()
     }
 
-    pub fn run<RequirementT, F>(
+    pub fn run_fn<RequirementT, F>(
         &self,
         f: F
     ) -> Box<impl futures::future::Future<Item=(), Error=()>>
@@ -180,6 +172,28 @@ impl MinimumDispatcherContext {
         )
     }
 
+    pub fn run_fn2<RequirementT, F>(
+        &self,
+        f: F
+    ) -> Box<impl futures::future::Future<Item=(), Error=()>>
+        where
+            RequirementT: RequiresResources + 'static + Send,
+            RequirementT: for<'a> DataRequirement<'a>,
+            F : Fn(<RequirementT as DataRequirement>::Borrow) + 'static,
+    {
+        use futures::future::Future;
+
+        Box::new(
+            acquire_resources::<RequirementT>(self.dispatcher.clone(), self.world.clone())
+                .map(move |acquired_resources| {
+                    acquired_resources.visit(move |resources| {
+                        (f)(resources);
+                    });
+                })
+        )
+    }
+
+
     pub fn run_task<T>(
         &self,
         mut task: T
@@ -191,30 +205,10 @@ impl MinimumDispatcherContext {
 
         Box::new(
             acquire_resources::<T::RequiredResources>(self.dispatcher.clone(), self.world.clone())
-                .and_then(move |acquired_resources| {
-                    task.run(acquired_resources);
-                    Ok(())
-                })
-        )
-    }
-
-    pub fn run_task2<T>(
-        &self,
-        mut task: T
-    ) -> Box<impl futures::future::Future<Item=(), Error=()>>
-        where
-            T: minimum::Task,
-    {
-        use futures::future::Future;
-
-        Box::new(
-            acquire_resources::<T::RequiredResources>(self.dispatcher.clone(), self.world.clone())
-                .and_then(move |acquired_resources| {
+                .map(move |acquired_resources| {
                     acquired_resources.visit(move |resources| {
-                        task.run2(resources);
+                        task.run(resources);
                     });
-
-                    Ok(())
                 })
         )
     }

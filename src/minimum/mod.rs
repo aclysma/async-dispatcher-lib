@@ -1,3 +1,7 @@
+// This implements a type system for expressing read/write dependencies.
+//
+// Lots of inspiration taken from shred for how to create a type system
+// to express read/write dependencies
 
 use hashbrown::HashMap;
 use mopa::Any;
@@ -251,33 +255,44 @@ impl<'a, T> std::ops::DerefMut for WriteBorrow<'a, T>
     }
 }
 
+//
+// Task
+//
+pub trait Task
+    where
+{
+    type RequiredResources : for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
+
+
+    fn run(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow);
+}
 
 macro_rules! impl_data {
     ( $($ty:ident),* ) => {
 
+        //
+        // Make tuples containing DataBorrow types implement DataBorrow
+        //
         impl<$($ty),*> DataBorrow for ( $( $ty , )* )
+        where $( $ty : DataBorrow ),*
+        {
 
-            where $( $ty : DataBorrow ),*
-            {
+        }
 
-            }
-
-
-
+        //
+        // Make tuples containing DataRequirement types implement DataBorrow. Additionally implement
+        // fetch
+        //
         impl<'a, $($ty),*> DataRequirement<'a> for ( $( $ty , )* )
+        where $( $ty : DataRequirement<'a> ),*
+        {
+            type Borrow = ( $( <$ty as DataRequirement<'a>>::Borrow, )* );
 
-            where $( $ty : DataRequirement<'a> ),*
-            {
-
-                type Borrow = ( $( <$ty as DataRequirement<'a>>::Borrow, )* );
-
-
-                fn fetch(world: &'a World) -> Self::Borrow {
-                    #![allow(unused_variables)]
-
-                    ( $( <$ty as DataRequirement<'a>>::fetch(world), )* )
-                }
+            fn fetch(world: &'a World) -> Self::Borrow {
+                #![allow(unused_variables)]
+                ( $( <$ty as DataRequirement<'a>>::fetch(world), )* )
             }
+        }
     };
 }
 
@@ -293,21 +308,23 @@ mod impl_data {
     impl_data!(A, B, C, D, E);
     impl_data!(A, B, C, D, E, F);
     impl_data!(A, B, C, D, E, F, G);
-    //TODO: More of these
-}
-
-
-
-//
-// Task
-//
-pub trait Task
-where
-{
-    type RequiredResources : for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
-
-
-    fn run(&mut self, data: AcquiredResources<Self::RequiredResources>);
-
-    fn run2(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow);
+    impl_data!(A, B, C, D, E, F, G, H);
+    impl_data!(A, B, C, D, E, F, G, H, I);
+    impl_data!(A, B, C, D, E, F, G, H, I, J);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y);
+    impl_data!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z);
 }
