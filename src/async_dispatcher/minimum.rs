@@ -172,28 +172,6 @@ impl MinimumDispatcherContext {
         )
     }
 
-    pub fn run_fn2<RequirementT, F>(
-        &self,
-        f: F
-    ) -> Box<impl futures::future::Future<Item=(), Error=()>>
-        where
-            RequirementT: RequiresResources + 'static + Send,
-            RequirementT: for<'a> DataRequirement<'a>,
-            F : Fn(<RequirementT as DataRequirement>::Borrow) + 'static,
-    {
-        use futures::future::Future;
-
-        Box::new(
-            acquire_resources::<RequirementT>(self.dispatcher.clone(), self.world.clone())
-                .map(move |acquired_resources| {
-                    acquired_resources.visit(move |resources| {
-                        (f)(resources);
-                    });
-                })
-        )
-    }
-
-
     pub fn run_task<T>(
         &self,
         mut task: T
