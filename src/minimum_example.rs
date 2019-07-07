@@ -17,7 +17,10 @@ use crate::async_dispatcher::{
     ExecuteSequential,
     RequiresResources,
     minimum::acquire_resources,
+    minimum::MinimumDispatcherBuilder,
+    minimum::MinimumDispatcher
 };
+
 use crate::async_dispatcher::minimum::AcquiredResources;
 
 struct HelloWorldResourceA {
@@ -26,25 +29,6 @@ struct HelloWorldResourceA {
 
 struct HelloWorldResourceB {
     value: i32,
-}
-
-fn acquire_resources_and_use<RequirementT, F>(
-    dispatcher: Arc<Dispatcher>,
-    world: Arc<World>,
-    f: F
-) -> Box<impl futures::future::Future<Item=(), Error=()>>
-    where
-        RequirementT: RequiresResources + 'static + Send,
-        F : Fn(AcquiredResources<RequirementT>) + 'static,
-{
-    use futures::future::Future;
-
-    Box::new(
-        acquire_resources::<RequirementT>(dispatcher.clone(), world.clone())
-        .map(move |acquired_resources| {
-            (f)(acquired_resources);
-        })
-    )
 }
 
 fn example_inline(resources: AcquiredResources<(
@@ -74,34 +58,21 @@ fn example_single_resource(resources: AcquiredResources<Write<HelloWorldResource
 
 pub fn minimum_example() {
 
-    let mut world = World::new();
-
-    world.insert(HelloWorldResourceA { value: 5 } );
-    world.insert(HelloWorldResourceB { value: 10 } );
-
-    let world = Arc::new(world);
-
-    let dispatcher = DispatcherBuilder::new()
-        .register_resource::<HelloWorldResourceA>()
-        .register_resource::<HelloWorldResourceB>()
+    let dispatcher = MinimumDispatcherBuilder::new()
+        .insert(HelloWorldResourceA { value: 5 } )
+        .insert(HelloWorldResourceB { value: 10 } )
         .build();
 
-    dispatcher.enter_game_loop(move |dispatcher| {
+    use futures::future::Future;
 
-        use futures::future::Future;
-
-
+    let world = dispatcher.enter_game_loop(move |ctx| {
         ExecuteSequential::new(vec![
-
-            // Clean way
-            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_inline),
-            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_typedef),
-            acquire_resources_and_use(dispatcher.clone(), world.clone(), example_single_resource),
+            ctx.run(example_inline),
+            ctx.run(example_typedef),
+            ctx.run(example_single_resource),
 
             // Closure is still possible
-            acquire_resources_and_use(
-                dispatcher.clone(),
-                world.clone(),
+            ctx.run(
                 |resources: AcquiredResources<(
                     Read<HelloWorldResourceA>,
                     Write<HelloWorldResourceB>
@@ -111,7 +82,7 @@ pub fn minimum_example() {
                         println!("a {}", a.value);
                     })
                 }
-            ),
+            )
         ])
-    })
+    });
 }
