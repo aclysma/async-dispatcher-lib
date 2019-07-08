@@ -15,4 +15,4 @@ pub use async_dispatcher::ExecuteParallel;
 pub use async_dispatcher::ExecuteSequential;
 pub use async_dispatcher::RequiredResources;
 pub use async_dispatcher::RequiresResources;
-pub use async_dispatcher::ResourceId;
+pub use async_dispatcher::ResourceIdTrait;

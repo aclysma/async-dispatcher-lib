@@ -2,14 +2,16 @@ use hashbrown::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use super::ResourceId;
+//use super::ResourceId;
 
 // This allows the user to add all the resources that will be used during execution
-pub struct DispatcherBuilder {
+pub struct DispatcherBuilder<ResourceId> {
     resource_locks: HashMap<ResourceId, tokio::sync::lock::Lock<()>>,
 }
 
-impl DispatcherBuilder {
+impl<ResourceId> DispatcherBuilder<ResourceId>
+where ResourceId : super::ResourceIdTrait
+{
     // Create an empty dispatcher builder
     pub fn new() -> Self {
         DispatcherBuilder {
@@ -17,23 +19,22 @@ impl DispatcherBuilder {
         }
     }
 
-    pub fn register_resource<T: 'static>(self) -> Self {
-        self.register_resource_id(ResourceId::new::<T>())
+    pub fn with_resource_id(mut self, resource_id: ResourceId) -> Self {
+        self.register_resource_id(resource_id);
+        self
     }
 
     // Insert a resource that will be available once the dispatcher is running. This will create
     // locks for each resource to be used during dispatch
-    pub fn register_resource_id(mut self, resource_id: ResourceId) -> Self {
+    pub fn register_resource_id(&mut self, resource_id: ResourceId) {
         // We could possibly do this just-in-time since we global lock to dispatch anyways, but
         // it would require wrapping in an RwLock so that we can get a mut ref
         self.resource_locks
             .insert(resource_id.clone(), tokio::sync::lock::Lock::new(()));
-
-        self
     }
 
     // Create the dispatcher
-    pub fn build(self) -> Dispatcher {
+    pub fn build(self) -> Dispatcher<ResourceId> {
         return Dispatcher {
             next_task_id: std::sync::atomic::AtomicUsize::new(0),
             dispatch_lock: tokio::sync::lock::Lock::new(()),
@@ -49,7 +50,9 @@ impl DispatcherBuilder {
 // acquire a task, it drops any locks it has already acquired and awaits the lock it couldn't get.
 // This way it's not blocking any other tasks that are able to proceed, and it's not spinning while
 // it's waiting.
-pub struct Dispatcher {
+pub struct Dispatcher<ResourceId>
+where ResourceId : super::ResourceIdTrait
+{
     next_task_id: std::sync::atomic::AtomicUsize,
     dispatch_lock: tokio::sync::lock::Lock<()>,
     //TODO: Change this to a RwLock, but waiting until I have something more "real" to test with
@@ -57,7 +60,9 @@ pub struct Dispatcher {
     should_terminate: std::sync::atomic::AtomicBool,
 }
 
-impl Dispatcher {
+impl<ResourceId> Dispatcher<ResourceId>
+where ResourceId : super::ResourceIdTrait
+{
     pub(super) fn dispatch_lock(&self) -> &tokio::sync::lock::Lock<()> {
         &self.dispatch_lock
     }
@@ -80,7 +85,7 @@ impl Dispatcher {
     // Call this to kick off processing.
     pub fn enter_game_loop<F, FutureT>(self, f: F)
     where
-        F: Fn(Arc<Dispatcher>) -> FutureT + Send + Sync + 'static,
+        F: Fn(Arc<Dispatcher<ResourceId>>) -> FutureT + Send + Sync + 'static,
         FutureT: futures::future::Future<Item = (), Error = ()> + Send + 'static,
     {
         // Put the dispatcher in an Arc so it can be shared among tasks

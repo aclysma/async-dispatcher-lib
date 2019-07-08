@@ -1,10 +1,15 @@
 use crate::async_dispatcher::DispatcherBuilder;
-use crate::async_dispatcher::ResourceId;
 use crate::async_dispatcher::{Dispatcher, RequiresResources};
 
 use std::sync::Arc;
 
-impl<'a, T: shred::Resource> RequiresResources for shred::ReadExpect<'a, T> {
+use shred::ResourceId;
+
+impl crate::async_dispatcher::ResourceIdTrait for ResourceId {
+
+}
+
+impl<'a, T: shred::Resource> RequiresResources<ResourceId> for shred::ReadExpect<'a, T> {
     fn reads() -> Vec<ResourceId> {
         vec![ResourceId::new::<T>()]
     }
@@ -13,7 +18,7 @@ impl<'a, T: shred::Resource> RequiresResources for shred::ReadExpect<'a, T> {
     }
 }
 
-impl<'a, T: shred::Resource> RequiresResources for shred::WriteExpect<'a, T> {
+impl<'a, T: shred::Resource> RequiresResources<ResourceId> for shred::WriteExpect<'a, T> {
     fn reads() -> Vec<ResourceId> {
         vec![]
     }
@@ -21,9 +26,11 @@ impl<'a, T: shred::Resource> RequiresResources for shred::WriteExpect<'a, T> {
         vec![ResourceId::new::<T>()]
     }
 }
+
+
 
 pub struct ShredDispatcherBuilder {
-    dispatcher_builder: DispatcherBuilder,
+    dispatcher_builder: DispatcherBuilder<ResourceId>,
     world: shred::World,
 }
 
@@ -38,7 +45,7 @@ impl ShredDispatcherBuilder {
 
     pub fn insert<T: shred::Resource>(mut self, resource: T) -> Self {
         self.world.insert(resource);
-        self.dispatcher_builder = self.dispatcher_builder.register_resource::<T>();
+        self.dispatcher_builder.register_resource_id(ResourceId::new::<T>());
 
         self
     }
@@ -53,7 +60,7 @@ impl ShredDispatcherBuilder {
 }
 
 pub struct ShredDispatcher {
-    dispatcher: Dispatcher,
+    dispatcher: Dispatcher<ResourceId>,
     world: Arc<shred::World>,
 }
 
@@ -86,7 +93,7 @@ impl ShredDispatcher {
 }
 
 pub struct ShredDispatcherContext {
-    dispatcher: Arc<Dispatcher>,
+    dispatcher: Arc<Dispatcher<ResourceId>>,
     world: Arc<shred::World>,
 }
 
@@ -95,7 +102,7 @@ impl ShredDispatcherContext {
         self.dispatcher.end_game_loop();
     }
 
-    pub fn dispatcher(&self) -> Arc<Dispatcher> {
+    pub fn dispatcher(&self) -> Arc<Dispatcher<ResourceId>> {
         self.dispatcher.clone()
     }
 
@@ -111,12 +118,12 @@ impl ShredDispatcherContext {
     ) -> Box<impl futures::future::Future<Item = (), Error = ()>>
     where
         T: shred::System<'static> + 'static,
-        <T as shred::System<'static>>::SystemData: RequiresResources,
+        <T as shred::System<'static>>::SystemData: RequiresResources<ResourceId>,
     {
         use futures::future::Future;
 
         let required_resources =
-            <<T as shred::System<'static>>::SystemData as RequiresResources>::required_resources();
+            <<T as shred::System<'static>>::SystemData as RequiresResources<ResourceId>>::required_resources();
 
         //let dispatcher = self.dispatcher.clone();
         let world = self.world.clone();

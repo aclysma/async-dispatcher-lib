@@ -46,8 +46,8 @@ impl Task for ExampleTask {
 
 fn main() {
     let dispatcher = MinimumDispatcherBuilder::new()
-        .insert(HelloWorldResourceA { value: 5 })
-        .insert(HelloWorldResourceB { value: 10 })
+        .with_resource(HelloWorldResourceA { value: 5 })
+        .with_resource(HelloWorldResourceB { value: 10 })
         .build();
 
     let _world = dispatcher.enter_game_loop(move |ctx| {

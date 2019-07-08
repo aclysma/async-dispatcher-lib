@@ -13,6 +13,6 @@ pub use execute_parallel::ExecuteParallel;
 pub use execute_sequential::ExecuteSequential;
 pub use required_resources::RequiredResources;
 pub use required_resources::RequiresResources;
-pub use resource_id::ResourceId;
+pub use resource_id::ResourceIdTrait;
 
 pub mod support;

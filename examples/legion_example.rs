@@ -2,9 +2,10 @@ use legion::prelude::*;
 
 use std::sync::Arc;
 
-use async_dispatcher::DispatcherBuilder;
-
-use async_dispatcher::support::legion::create_query;
+use async_dispatcher::support::legion::{
+    create_query,
+    LegionDispatcherBuilder
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Pos(f32, f32, f32);
@@ -32,11 +33,11 @@ fn main() {
 
     let world = Arc::new(world);
 
-    let dispatcher = DispatcherBuilder::new()
-        .register_resource::<Pos>()
-        .register_resource::<Vel>()
-        .register_resource::<ResA>()
-        .register_resource::<ResB>()
+    let dispatcher = LegionDispatcherBuilder::new()
+        .with_resource_type::<Pos>()
+        .with_resource_type::<Vel>()
+        .with_resource_type::<ResA>()
+        .with_resource_type::<ResB>()
         .build();
 
     use futures::future::Future;

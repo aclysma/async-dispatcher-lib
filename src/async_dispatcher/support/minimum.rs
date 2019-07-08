@@ -2,15 +2,21 @@ use std::sync::Arc;
 
 use crate::async_dispatcher::{
     AcquireResources, AcquiredResourcesLockGuards, Dispatcher, DispatcherBuilder,
-    RequiresResources, ResourceId,
+    RequiresResources
 };
 
 use crate::minimum;
+use crate::minimum::ResourceId;
+
+
+impl crate::async_dispatcher::ResourceIdTrait for ResourceId {
+
+}
 
 //
 // Hook up Read/Write to the resource system
 //
-impl<T: minimum::Resource> RequiresResources for minimum::Read<T> {
+impl<T: minimum::Resource> RequiresResources<ResourceId> for minimum::Read<T> {
     fn reads() -> Vec<ResourceId> {
         vec![ResourceId::new::<T>()]
     }
@@ -19,7 +25,7 @@ impl<T: minimum::Resource> RequiresResources for minimum::Read<T> {
     }
 }
 
-impl<T: minimum::Resource> RequiresResources for minimum::Write<T> {
+impl<T: minimum::Resource> RequiresResources<ResourceId> for minimum::Write<T> {
     fn reads() -> Vec<ResourceId> {
         vec![]
     }
@@ -33,7 +39,7 @@ impl<T: minimum::Resource> RequiresResources for minimum::Write<T> {
 //
 pub struct AcquiredResources<T>
 where
-    T: RequiresResources + 'static + Send,
+    T: RequiresResources<ResourceId> + 'static + Send,
 {
     _lock_guards: AcquiredResourcesLockGuards<T>,
     world: Arc<minimum::World>,
@@ -41,7 +47,7 @@ where
 
 impl<T> AcquiredResources<T>
 where
-    T: RequiresResources + 'static + Send,
+    T: RequiresResources<ResourceId> + 'static + Send,
 {
     pub fn visit<'a, F>(&'a self, f: F)
     where
@@ -59,11 +65,11 @@ where
 // Creates a future to acquire the resources needed
 //
 pub fn acquire_resources<T>(
-    dispatcher: Arc<Dispatcher>,
+    dispatcher: Arc<Dispatcher<ResourceId>>,
     world: Arc<minimum::World>,
 ) -> impl futures::future::Future<Item = AcquiredResources<T>, Error = ()>
 where
-    T: RequiresResources + 'static + Send,
+    T: RequiresResources<ResourceId> + 'static + Send,
 {
     use futures::future::Future;
 
@@ -78,7 +84,7 @@ where
 }
 
 pub struct MinimumDispatcherBuilder {
-    dispatcher_builder: DispatcherBuilder,
+    dispatcher_builder: DispatcherBuilder<ResourceId>,
     world: minimum::World,
 }
 
@@ -91,11 +97,31 @@ impl MinimumDispatcherBuilder {
         }
     }
 
-    pub fn insert<T: minimum::Resource>(mut self, resource: T) -> Self {
-        self.world.insert(resource);
-        self.dispatcher_builder = self.dispatcher_builder.register_resource::<T>();
+    pub fn from_world(world: minimum::World) -> MinimumDispatcherBuilder {
 
+        let mut dispatcher_builder = DispatcherBuilder::new();
+        for resource in world.keys() {
+            dispatcher_builder.register_resource_id(resource.clone());
+        }
+
+        MinimumDispatcherBuilder {
+            dispatcher_builder,
+            world
+        }
+    }
+
+    pub fn with_resource<T: minimum::Resource>(mut self, resource: T) -> Self {
+        self.insert_resource(resource);
         self
+    }
+
+    pub fn insert_resource<T: minimum::Resource>(&mut self, resource: T) {
+        self.world.insert(resource);
+        self.dispatcher_builder.register_resource_id(ResourceId::new::<T>());
+    }
+
+    pub fn world(&self) -> &minimum::World {
+        &self.world
     }
 
     // Create the dispatcher
@@ -108,7 +134,7 @@ impl MinimumDispatcherBuilder {
 }
 
 pub struct MinimumDispatcher {
-    dispatcher: Dispatcher,
+    dispatcher: Dispatcher<ResourceId>,
     world: Arc<minimum::World>,
 }
 
@@ -141,7 +167,7 @@ impl MinimumDispatcher {
 }
 
 pub struct MinimumDispatcherContext {
-    dispatcher: Arc<Dispatcher>,
+    dispatcher: Arc<Dispatcher<ResourceId>>,
     world: Arc<minimum::World>,
 }
 
@@ -150,7 +176,7 @@ impl MinimumDispatcherContext {
         self.dispatcher.end_game_loop();
     }
 
-    pub fn dispatcher(&self) -> Arc<Dispatcher> {
+    pub fn dispatcher(&self) -> Arc<Dispatcher<ResourceId>> {
         self.dispatcher.clone()
     }
 
@@ -163,7 +189,7 @@ impl MinimumDispatcherContext {
         f: F,
     ) -> Box<impl futures::future::Future<Item = (), Error = ()>>
     where
-        RequirementT: RequiresResources + 'static + Send,
+        RequirementT: RequiresResources<ResourceId> + 'static + Send,
         F: Fn(AcquiredResources<RequirementT>) + 'static,
     {
         use futures::future::Future;

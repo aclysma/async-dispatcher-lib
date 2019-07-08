@@ -99,11 +99,11 @@ impl World {
             .map(|x| *x)
     }
 
-    fn fetch<R: Resource>(&self) -> ReadBorrow<R> {
+    pub fn fetch<R: Resource>(&self) -> ReadBorrow<R> {
         self.try_fetch().unwrap()
     }
 
-    fn try_fetch<R: Resource>(&self) -> Option<ReadBorrow<R>> {
+    pub fn try_fetch<R: Resource>(&self) -> Option<ReadBorrow<R>> {
         let res_id = ResourceId::new::<R>();
 
         self.resources.get(&res_id).map(|r| ReadBorrow {
@@ -112,17 +112,32 @@ impl World {
         })
     }
 
-    fn fetch_mut<R: Resource>(&self) -> WriteBorrow<R> {
+    pub fn fetch_mut<R: Resource>(&self) -> WriteBorrow<R> {
         self.try_fetch_mut().unwrap()
     }
 
-    fn try_fetch_mut<R: Resource>(&self) -> Option<WriteBorrow<R>> {
+    pub fn try_fetch_mut<R: Resource>(&self) -> Option<WriteBorrow<R>> {
         let res_id = ResourceId::new::<R>();
 
         self.resources.get(&res_id).map(|r| WriteBorrow::<R> {
             inner: RefMut::map(r.borrow_mut(), Box::as_mut),
             phantom: PhantomData,
         })
+    }
+
+    pub fn has_value<R>(&self) -> bool
+        where
+            R: Resource,
+    {
+        self.has_value_raw(ResourceId::new::<R>())
+    }
+
+    pub fn has_value_raw(&self, id: ResourceId) -> bool {
+        self.resources.contains_key(&id)
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item=&ResourceId> {
+        self.resources.iter().map(|x| x.0)
     }
 }
 
@@ -242,7 +257,7 @@ where
 // Task
 //
 pub trait Task {
-    type RequiredResources: for<'a> DataRequirement<'a> + RequiresResources + Send + 'static;
+    type RequiredResources: for<'a> DataRequirement<'a> + RequiresResources<ResourceId> + Send + 'static;
 
     fn run(&mut self, data: <Self::RequiredResources as DataRequirement>::Borrow);
 }

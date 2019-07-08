@@ -1,17 +1,24 @@
-use super::ResourceId;
+//use super::ResourceId;
 use std::marker::PhantomData;
+use crate::async_dispatcher::ResourceIdTrait;
 
 // This is a helper that determines the reads/writes required for a system. I would have preferred
 // not to need this structure at all, but many of the shred types require lifetimes that just
 // don't play nicely with tasks. This gets rid of those lifetimes.
 #[derive(Debug)]
-pub struct RequiredResources<T> {
+pub struct RequiredResources<T, ResourceId>
+where ResourceId : ResourceIdTrait
+{
     pub(super) reads: Vec<ResourceId>,
     pub(super) writes: Vec<ResourceId>,
     phantom_data: PhantomData<T>,
 }
 
-impl<T: RequiresResources> RequiredResources<T> {
+impl<T, ResourceId> RequiredResources<T, ResourceId>
+where
+    T : RequiresResources<ResourceId>,
+    ResourceId : ResourceIdTrait
+{
     pub fn new() -> Self {
         RequiredResources {
             reads: T::reads(),
@@ -21,16 +28,20 @@ impl<T: RequiresResources> RequiredResources<T> {
     }
 }
 
-pub trait RequiresResources: Sized {
-    fn reads() -> Vec<super::ResourceId>;
-    fn writes() -> Vec<super::ResourceId>;
+pub trait RequiresResources<ResourceId>: Sized
+where ResourceId : super::ResourceIdTrait
+{
+    fn reads() -> Vec<ResourceId>;
+    fn writes() -> Vec<ResourceId>;
 
-    fn required_resources() -> RequiredResources<Self> {
-        RequiredResources::<Self>::new()
+    fn required_resources() -> RequiredResources<Self, ResourceId> {
+        RequiredResources::<Self, ResourceId>::new()
     }
 }
 
-impl RequiresResources for () {
+impl<ResourceId> RequiresResources<ResourceId> for ()
+where ResourceId : super::ResourceIdTrait
+{
     fn reads() -> Vec<ResourceId> {
         vec![]
     }
@@ -41,8 +52,8 @@ impl RequiresResources for () {
 
 macro_rules! impl_data {
     ( $($ty:ident),* ) => {
-        impl<$($ty),*> RequiresResources for ( $( $ty , )* )
-            where $( $ty : RequiresResources ),*
+        impl<$($ty),*, ResourceId : super::ResourceIdTrait> RequiresResources<ResourceId> for ( $( $ty , )* )
+            where $( $ty : RequiresResources<ResourceId> ),*
             {
                 fn reads() -> Vec<ResourceId> {
                     #![allow(unused_mut)]
@@ -50,7 +61,7 @@ macro_rules! impl_data {
                     let mut r = Vec::new();
 
                     $( {
-                        let mut reads = <$ty as RequiresResources>::reads();
+                        let mut reads = <$ty as RequiresResources<ResourceId>>::reads();
                         r.append(&mut reads);
                     } )*
 
@@ -63,7 +74,7 @@ macro_rules! impl_data {
                     let mut r = Vec::new();
 
                     $( {
-                        let mut writes = <$ty as RequiresResources>::writes();
+                        let mut writes = <$ty as RequiresResources<ResourceId>>::writes();
                         r.append(&mut writes);
                     } )*
 

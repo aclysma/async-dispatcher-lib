@@ -1,26 +1,32 @@
 use std::sync::Arc;
 
 use crate::async_dispatcher::{
-    AcquireResources, AcquiredResourcesLockGuards, Dispatcher, RequiresResources, ResourceId,
+    AcquireResources, AcquiredResourcesLockGuards, Dispatcher, RequiresResources, DispatcherBuilder
 };
 
 use legion::query::IntoQuery;
 
-impl<T: legion::Component> RequiresResources for legion::query::Read<T> {
-    fn reads() -> Vec<ResourceId> {
-        vec![ResourceId::new::<T>()]
+use std::any::TypeId;
+
+impl crate::async_dispatcher::ResourceIdTrait for TypeId {
+
+}
+
+impl<T: legion::Component> RequiresResources<TypeId> for legion::query::Read<T> {
+    fn reads() -> Vec<TypeId> {
+        vec![TypeId::of::<T>()]
     }
-    fn writes() -> Vec<ResourceId> {
+    fn writes() -> Vec<TypeId> {
         vec![]
     }
 }
 
-impl<T: legion::Component> RequiresResources for legion::query::Write<T> {
-    fn reads() -> Vec<ResourceId> {
+impl<T: legion::Component> RequiresResources<TypeId> for legion::query::Write<T> {
+    fn reads() -> Vec<TypeId> {
         vec![]
     }
-    fn writes() -> Vec<ResourceId> {
-        vec![ResourceId::new::<T>()]
+    fn writes() -> Vec<TypeId> {
+        vec![TypeId::of::<T>()]
     }
 }
 
@@ -50,13 +56,13 @@ where
 }
 
 pub fn create_query<T>(
-    dispatcher: Arc<Dispatcher>,
+    dispatcher: Arc<Dispatcher<TypeId>>,
 ) -> impl futures::future::Future<Item = AsyncQuery<T>, Error = ()>
 where
-    T: RequiresResources,
+    T: RequiresResources<TypeId>,
     T: legion::query::DefaultFilter + for<'a> legion::query::View<'a>,
 {
-    let required_resources = <T as RequiresResources>::required_resources();
+    let required_resources = <T as RequiresResources<TypeId>>::required_resources();
     let query = T::query();
 
     use futures::future::Future;
@@ -66,4 +72,31 @@ where
         _lock_guards: lock_guards,
         query,
     })
+}
+
+pub struct LegionDispatcherBuilder {
+    dispatcher_builder: DispatcherBuilder<TypeId>
+}
+
+impl LegionDispatcherBuilder {
+    // Create an empty dispatcher builder
+    pub fn new() -> Self {
+        LegionDispatcherBuilder {
+            dispatcher_builder: DispatcherBuilder::<TypeId>::new()
+        }
+    }
+
+    pub fn with_resource_type<T : 'static>(mut self) -> Self {
+        self.insert_resource_type::<T>();
+        self
+    }
+
+    pub fn insert_resource_type<T : 'static>(&mut self) {
+        self.dispatcher_builder.register_resource_id(TypeId::of::<T>());
+    }
+
+    // Create the dispatcher
+    pub fn build(self) -> Dispatcher<TypeId> {
+        self.dispatcher_builder.build()
+    }
 }
