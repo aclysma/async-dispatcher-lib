@@ -98,7 +98,6 @@ impl MinimumDispatcherBuilder {
     }
 
     pub fn from_world(world: minimum::World) -> MinimumDispatcherBuilder {
-
         let mut dispatcher_builder = DispatcherBuilder::new();
         for resource in world.keys() {
             dispatcher_builder.register_resource_id(resource.clone());

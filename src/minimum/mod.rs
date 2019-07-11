@@ -51,6 +51,37 @@ mod __resource_mopafy_scope {
 
 impl<T> Resource for T where T: Any + Send + Sync {}
 
+pub struct WorldBuilder {
+    world: World
+}
+
+impl WorldBuilder {
+    pub fn new() -> Self {
+        WorldBuilder {
+            world: World::new()
+        }
+    }
+
+    pub fn with_resource<R>(mut self, r: R) -> Self
+        where
+            R: Resource
+    {
+        self.world.insert(r);
+        self
+    }
+
+    pub fn insert<R>(&mut self, r: R)
+        where
+            R: Resource
+    {
+        self.world.insert(r);
+    }
+
+    pub fn build(self) -> World {
+        self.world
+    }
+}
+
 //
 // World
 //
